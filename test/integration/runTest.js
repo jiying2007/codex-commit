@@ -15,6 +15,31 @@ function exec(command, args, cwd) {
   if (r.status !== 0) throw new Error(r.stderr || r.stdout);
 }
 
+function applyWindowsVerbatimCandidate() {
+  if (process.platform !== 'win32') return;
+  const file = path.resolve(__dirname, '..', '..', 'extension.js');
+  let s = fs.readFileSync(file, 'utf8');
+  const replacements = [
+    [
+      "  return {\n    command: process.env.ComSpec || 'cmd.exe',\n    args: ['/d', '/s', '/c', commandLine],\n    shell: false\n  };",
+      "  return {\n    command: process.env.ComSpec || 'cmd.exe',\n    args: ['/d', '/s', '/c', commandLine],\n    shell: false,\n    windowsVerbatimArguments: true\n  };"
+    ],
+    [
+      "    { ...options, shell: false },\n    stdinText,",
+      "    {\n      ...options,\n      shell: false,\n      windowsVerbatimArguments: prepared.windowsVerbatimArguments === true\n    },\n    stdinText,"
+    ],
+    [
+      "        windowsHide: true,\n        shell: options.shell === true,\n        detached: process.platform !== 'win32'",
+      "        windowsHide: true,\n        shell: options.shell === true,\n        windowsVerbatimArguments: options.windowsVerbatimArguments === true,\n        detached: process.platform !== 'win32'"
+    ]
+  ];
+  for (const [from, to] of replacements) {
+    if (!s.includes(from)) throw new Error(`Windows candidate patch target not found: ${from.split('\n')[0]}`);
+    s = s.replace(from, to);
+  }
+  fs.writeFileSync(file, s);
+}
+
 function initRepo(root, file, content) {
   fs.mkdirSync(root, { recursive: true });
   exec('git', ['init'], root);
@@ -50,6 +75,8 @@ setTimeout(()=>console.log(JSON.stringify({
 }
 
 async function main() {
+  applyWindowsVerbatimCandidate();
+
   const base=fs.mkdtempSync(path.join(os.tmpdir(),'codex-commit-it-'));
   const repo1=path.join(base,'repo1');
   const repo2=path.join(base,'repo2');
