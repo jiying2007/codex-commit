@@ -1,0 +1,44 @@
+name: Bootstrap clean repository
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.bootstrap/**'
+      - '.github/workflows/bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/part-* > /tmp/source.b64
+          base64 -d /tmp/source.b64 > /tmp/source.tar.gz
+          echo "4770950f0d90046d11a502bb51bca0fd54d6ffdef4c869fcc3940e2c05e36f90  /tmp/source.tar.gz" | sha256sum -c -
+          mkdir -p /tmp/source
+          tar -xzf /tmp/source.tar.gz -C /tmp/source
+
+      - name: Publish clean initial commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan clean-main
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/source/. .
+          rm -rf .bootstrap
+          rm -f .github/workflows/bootstrap.yml
+          git add -A
+          git commit -m "feat: initial release"
+          git push --force origin HEAD:main
