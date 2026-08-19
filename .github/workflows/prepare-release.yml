@@ -5,11 +5,11 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   prepare:
-    if: github.head_ref == 'release-1.2.0'
+    if: github.head_ref == 'release-1.2.0' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,14 +64,12 @@ jobs:
           test -f codex-commit-safe-1.2.0.vsix
           sha256sum codex-commit-safe-1.2.0.vsix > SHA256SUMS
 
-      - name: Commit prepared release
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- ':!.github/workflows'
-          if ! git diff --cached --quiet; then
-            git commit -m "refactor: rename extension identity"
-            git push origin HEAD:release-1.2.0
-          fi
+      - name: Upload verified release outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-commit-safe-1.2.0
+          path: |
+            package-lock.json
+            codex-commit-safe-1.2.0.vsix
+            SHA256SUMS
+          if-no-files-found: error
