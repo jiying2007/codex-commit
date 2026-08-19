@@ -33,8 +33,13 @@ jobs:
           echo '03fba1645839b9b8bbea8830a2d95133e44b6f8855fb488ebdec763ae96a7431  /tmp/source.tar.gz' | sha256sum -c -
           tmp=$(mktemp -d)
           tar -xzf /tmp/source.tar.gz -C "$tmp"
+          mkdir -p /tmp/preserved-workflows
+          cp -a .github/workflows/. /tmp/preserved-workflows/
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .maintenance -exec rm -rf {} +
           cp -a "$tmp"/. .
+          rm -rf .github/workflows
+          mkdir -p .github/workflows
+          cp -a /tmp/preserved-workflows/. .github/workflows/
           rm -rf .maintenance
           npm run verify:lock
           npm ci --ignore-scripts --no-audit --no-fund
