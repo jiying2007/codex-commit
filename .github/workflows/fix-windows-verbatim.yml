@@ -1,0 +1,80 @@
+name: Fix Windows verbatim arguments
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.head_ref == 'trigger-windows-verbatim-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch Windows cmd.exe invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('extension.js')
+          s=p.read_text()
+          old="""  return {
+    command: process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/s', '/c', commandLine],
+    shell: false
+  };
+"""
+          new="""  return {
+    command: process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/s', '/c', commandLine],
+    shell: false,
+    windowsVerbatimArguments: true
+  };
+"""
+          if old not in s:
+              raise SystemExit('prepareCommand block not found')
+          s=s.replace(old,new,1)
+          old2="""    { ...options, shell: false },
+    stdinText,
+"""
+          new2="""    {
+      ...options,
+      shell: false,
+      windowsVerbatimArguments: prepared.windowsVerbatimArguments === true
+    },
+    stdinText,
+"""
+          if old2 not in s:
+              raise SystemExit('runPreparedProcess options block not found')
+          s=s.replace(old2,new2,1)
+          old3="""        windowsHide: true,
+        shell: options.shell === true,
+        detached: process.platform !== 'win32'
+"""
+          new3="""        windowsHide: true,
+        shell: options.shell === true,
+        windowsVerbatimArguments: options.windowsVerbatimArguments === true,
+        detached: process.platform !== 'win32'
+"""
+          if old3 not in s:
+              raise SystemExit('spawn options block not found')
+          s=s.replace(old3,new3,1)
+          p.write_text(s)
+          PY
+          node --check extension.js
+          grep -n "windowsVerbatimArguments" extension.js
+      - name: Commit runtime fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extension.js
+          git commit -m "fix: preserve cmd.exe argument quoting on Windows"
+          git push origin HEAD:main
