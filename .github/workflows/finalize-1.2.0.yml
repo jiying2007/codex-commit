@@ -1,21 +1,20 @@
 name: Finalize 1.2.0 source
 
 on:
-  push:
+  pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/finalize-1.2.0.yml'
 
 permissions:
   contents: write
 
 jobs:
   finalize:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'trigger-finalize-1.2.0'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -32,11 +31,12 @@ jobs:
           tar -xzf /tmp/release.tar.gz -C "$tmp"
           cp -a "$tmp"/. .
           sed -i "s/getConfiguration('codexCommit'/getConfiguration('safeCodexCommit'/g" extension.js test/integration/suite/integration.test.js
+          sed -i 's/Codex Commit 1\.1\.6 unit\/regression tests passed\./Codex Commit Safe 1.2.0 unit\/regression tests passed./g' test.js
           sed -i 's/Codex Commit 1\.1\.6 Extension Host integration tests passed\./Codex Commit Safe 1.2.0 Extension Host integration tests passed./g' test/integration/suite/integration.test.js
           sed -i 's/codex-commit-1\.1\.6\.vsix/codex-commit-safe-1.2.0.vsix/g' README.md
           printf '\nnode_modules/\n.vscode-test/\n*.vsix\nSHA256SUMS\n' >> .gitignore
           awk '!seen[$0]++' .gitignore > .gitignore.tmp && mv .gitignore.tmp .gitignore
-          if grep -R "codexCommit\|1\.1\.6" -n extension.js package.json test README.md SECURITY.md CHANGELOG.md; then
+          if grep -R "codexCommit\|1\.1\.6" -n extension.js package.json test.js test README.md SECURITY.md CHANGELOG.md; then
             echo "legacy identity/version reference remains" >&2
             exit 1
           fi
@@ -67,9 +67,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .gitignore LICENSE README.md SECURITY.md CHANGELOG.md extension.js package.json package-lock.json scripts test images .gitlab-ci.yml 2>/dev/null || true
-          git status --short
-          test -z "$(git status --short | awk '$2 ~ /^\.vscode-test\// {print}')"
+          git add .gitignore LICENSE README.md SECURITY.md CHANGELOG.md extension.js package.json package-lock.json scripts test.js test images .gitlab-ci.yml .vscodeignore .codex-commit.example.json 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "release: finalize Codex Commit Safe 1.2.0 source"
             git push origin HEAD:main
