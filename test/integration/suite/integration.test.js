@@ -29,6 +29,18 @@ async function run(){
     .update('codexPath',fake,vscode.ConfigurationTarget.Global);
   await wait(1200);
 
+  // Probe the exact Windows .cmd execution path before exercising SCM routing.
+  const own=vscode.extensions.getExtension('jiying2007.codex-commit-safe');
+  const ownExports=own.isActive?own.exports:await own.activate();
+  const versionProbe=await ownExports.__test.runPreparedProcess(fake,['--version'],{timeoutMs:5000});
+  console.log('Codex shim version probe:',JSON.stringify(versionProbe));
+  assert.match(versionProbe.stdout,/codex-cli fake/);
+  const execProbe=await ownExports.__test.runPreparedProcess(
+    fake,['exec','--json','-'],{timeoutMs:5000},'probe input\n'
+  );
+  console.log('Codex shim exec probe:',JSON.stringify(execProbe));
+  assert.match(execProbe.stdout,/item\.completed/);
+
   const api=await gitApi();
   const r1=byRoot(api,repo1),r2=byRoot(api,repo2);
   assert.ok(r1&&r2);
