@@ -25,7 +25,7 @@ async function run(){
   const repo2=process.env.CODEX_COMMIT_IT_REPO2;
   const fake=process.env.CODEX_COMMIT_IT_FAKE_CODEX;
   const delayFile=process.env.CODEX_COMMIT_IT_DELAY_FILE;
-  await vscode.workspace.getConfiguration('codexCommit')
+  await vscode.workspace.getConfiguration('safeCodexCommit')
     .update('codexPath',fake,vscode.ConfigurationTarget.Global);
   await wait(1200);
 
@@ -37,21 +37,21 @@ async function run(){
   fs.writeFileSync(delayFile,'10');
   await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(repo1,'wifi.c')));
   r1.inputBox.value=''; r2.inputBox.value='';
-  await vscode.commands.executeCommand('codexCommit.generate');
+  await vscode.commands.executeCommand('safeCodexCommit.generate');
   assert.match(r1.inputBox.value,/^fix\(wifi\): /);
   assert.strictEqual(r2.inputBox.value,'');
 
   // Multi-repo routing.
   await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(repo2,'motor.c')));
   r2.inputBox.value='';
-  await vscode.commands.executeCommand('codexCommit.generate');
+  await vscode.commands.executeCommand('safeCodexCommit.generate');
   assert.match(r2.inputBox.value,/^fix\(wifi\): /);
 
   // Index changed during generation => discard.
   await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(repo1,'wifi.c')));
   r1.inputBox.value='';
   fs.writeFileSync(delayFile,'800');
-  const p=vscode.commands.executeCommand('codexCommit.generate');
+  const p=vscode.commands.executeCommand('safeCodexCommit.generate');
   await wait(150);
   fs.appendFileSync(path.join(repo1,'wifi.c'),'int wifi2 = 2;\n');
   exec('git',['add','wifi.c'],repo1);
@@ -61,10 +61,10 @@ async function run(){
   // New request supersedes old request.
   r1.inputBox.value='';
   fs.writeFileSync(delayFile,'800');
-  const a=vscode.commands.executeCommand('codexCommit.generate');
+  const a=vscode.commands.executeCommand('safeCodexCommit.generate');
   await wait(100);
   fs.writeFileSync(delayFile,'20');
-  const b=vscode.commands.executeCommand('codexCommit.generate');
+  const b=vscode.commands.executeCommand('safeCodexCommit.generate');
   await Promise.all([a,b]);
   assert.match(r1.inputBox.value,/^fix\(wifi\): /);
 
@@ -73,7 +73,7 @@ async function run(){
   r1.inputBox.value='';
   process.env.CODEX_COMMIT_TEST_COLLECTION_DELAY_MS='300';
   fs.writeFileSync(delayFile,'20');
-  const collecting=vscode.commands.executeCommand('codexCommit.generate');
+  const collecting=vscode.commands.executeCommand('safeCodexCommit.generate');
   await wait(80);
   fs.appendFileSync(path.join(repo1,'wifi.c'),'int wifi_collection = 4;\n');
   exec('git',['add','wifi.c'],repo1);
@@ -88,7 +88,7 @@ async function run(){
   fs.appendFileSync(path.join(repo1,'wifi.c'),'int head_change = 5;\n');
   exec('git',['add','wifi.c'],repo1);
   fs.writeFileSync(delayFile,'800');
-  const headPending=vscode.commands.executeCommand('codexCommit.generate');
+  const headPending=vscode.commands.executeCommand('safeCodexCommit.generate');
   await wait(150);
   exec('git',['config','user.email','test@example.com'],repo1);
   exec('git',['config','user.name','Codex Commit Test'],repo1);
@@ -96,7 +96,7 @@ async function run(){
   await headPending;
   assert.strictEqual(r1.inputBox.value,'');
 
-  console.log('Codex Commit 1.1.6 Extension Host integration tests passed.');
+  console.log('Codex Commit Safe 1.2.0 Extension Host integration tests passed.');
 
 }
 module.exports={run};

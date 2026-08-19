@@ -630,7 +630,7 @@ function readProjectRules(repoRoot) {
 }
 
 function getEffectiveOptions(repoRoot) {
-  const config = vscode.workspace.getConfiguration('codexCommit', vscode.Uri.file(repoRoot));
+  const config = vscode.workspace.getConfiguration('safeCodexCommit', vscode.Uri.file(repoRoot));
   const project = readProjectRules(repoRoot);
 
   // codexPath/model are also application-scoped in package.json.
@@ -639,10 +639,10 @@ function getEffectiveOptions(repoRoot) {
   const model = String(getUserOnlySetting(config, 'model', '') || '').trim();
 
   if (!codexPath || codexPath.length > 1024 || /[\r\n\0]/.test(codexPath)) {
-    throw new Error('User-level codexCommit.codexPath 非法。');
+    throw new Error('User-level safeCodexCommit.codexPath 非法。');
   }
   if (model.length > 128 || /[\r\n\0]/.test(model)) {
-    throw new Error('User-level codexCommit.model 非法。');
+    throw new Error('User-level safeCodexCommit.model 非法。');
   }
 
   const language = project.language ?? config.get('language', 'zh-CN');
@@ -895,7 +895,7 @@ async function resolveCodexExecutable(codexPath) {
 
   const error = new Error(
     `找不到可用的 Codex CLI：${codexPath}。请确认终端可执行 "codex --version"，` +
-    '或在 User Settings 中设置 codexCommit.codexPath。'
+    '或在 User Settings 中设置 safeCodexCommit.codexPath。'
   );
   error.cause = lastError;
   throw error;
@@ -976,7 +976,7 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
     } catch (error) {
       if (isCliCompatibilityError(error)) {
         const wrapped = new Error(
-          '当前 Codex CLI 与 Codex Commit 1.1.6 所需参数不兼容。' +
+          '当前 Codex CLI 与 Codex Commit Safe 1.2.0 所需参数不兼容。' +
           '请升级 Codex CLI 后重试。原始错误：' +
           (error.stderr || error.message)
         );
@@ -1130,7 +1130,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
             if (action === '打开设置') {
               vscode.commands.executeCommand(
                 'workbench.action.openSettings',
-                'codexCommit.maxDiffBytes'
+                'safeCodexCommit.maxDiffBytes'
               );
             }
             return undefined;
@@ -1193,7 +1193,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
 
     log('generation completed successfully');
     const firstLine = message.split(/\r?\n/, 1)[0];
-    vscode.window.setStatusBarMessage(`$(check) Codex Commit: ${firstLine}`, 5000);
+    vscode.window.setStatusBarMessage(`$(check) Codex Commit Safe: ${firstLine}`, 5000);
   } finally {
     finishGeneration(key, state.id);
   }
@@ -1219,50 +1219,50 @@ async function checkEnvironment() {
 
   log(`environment ok: codex=${resolved.version || 'detected'}, git=detected`);
   vscode.window.showInformationMessage(
-    `Codex Commit 环境正常：${resolved.version || resolved.executable}；${gitVersion}`
+    `Codex Commit Safe 环境正常：${resolved.version || resolved.executable}；${gitVersion}`
   );
 }
 
 function friendlyError(error) {
   const detail = error?.stderr || error?.message || String(error);
   if (error?.code === 'ETIMEDOUT') {
-    return `${detail}。可提高 codexCommit.timeoutSeconds，或检查 Codex 网络/登录状态。`;
+    return `${detail}。可提高 safeCodexCommit.timeoutSeconds，或检查 Codex 网络/登录状态。`;
   }
   return detail;
 }
 
 function activate(context) {
   extensionMode = context.extensionMode;
-  outputChannel = vscode.window.createOutputChannel('Codex Commit');
+  outputChannel = vscode.window.createOutputChannel('Codex Commit Safe');
   context.subscriptions.push(outputChannel);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('codexCommit.generate', async (...args) => {
+    vscode.commands.registerCommand('safeCodexCommit.generate', async (...args) => {
       try {
         await generate({ regenerate: false, commandArgs: args });
       } catch (error) {
         log(`generation failed: code=${error?.code || 'unknown'}`);
         if (error?.code !== 'ECANCELLED') {
-          vscode.window.showErrorMessage(`Codex Commit 生成失败：${friendlyError(error)}`);
+          vscode.window.showErrorMessage(`Codex Commit Safe 生成失败：${friendlyError(error)}`);
         }
       }
     }),
-    vscode.commands.registerCommand('codexCommit.regenerate', async (...args) => {
+    vscode.commands.registerCommand('safeCodexCommit.regenerate', async (...args) => {
       try {
         await generate({ regenerate: true, commandArgs: args });
       } catch (error) {
         log(`regeneration failed: code=${error?.code || 'unknown'}`);
         if (error?.code !== 'ECANCELLED') {
-          vscode.window.showErrorMessage(`Codex Commit 重新生成失败：${friendlyError(error)}`);
+          vscode.window.showErrorMessage(`Codex Commit Safe 重新生成失败：${friendlyError(error)}`);
         }
       }
     }),
-    vscode.commands.registerCommand('codexCommit.checkEnvironment', async () => {
+    vscode.commands.registerCommand('safeCodexCommit.checkEnvironment', async () => {
       try {
         await checkEnvironment();
       } catch (error) {
         log(`environment check failed: code=${error?.code || 'unknown'}`);
-        vscode.window.showErrorMessage(`Codex Commit 环境检查失败：${friendlyError(error)}`);
+        vscode.window.showErrorMessage(`Codex Commit Safe 环境检查失败：${friendlyError(error)}`);
       }
     })
   );

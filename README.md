@@ -1,6 +1,8 @@
-# Codex Commit
+# Codex Commit Safe
 
-Generate Conventional Commit messages from staged Git changes in VS Code using the local Codex CLI.
+Generate safe, structured Conventional Commit messages from staged Git changes in VS Code using the local Codex CLI.
+
+> **Why “Safe”?** This extension is intentionally narrow: staged changes only, structured output, stale-result protection, minimal Codex capabilities, no automatic commit/push, and fail-closed multi-repository behavior.
 
 ## Features
 
@@ -19,7 +21,7 @@ Stage changes
     ↓
 VS Code Source Control
     ↓
-Codex Commit
+Codex Commit Safe
     ↓
 local Codex CLI
     ↓
@@ -45,6 +47,26 @@ feat(motor): 增加电机多种停机模式
 - 优化停机状态切换逻辑
 ```
 
+
+## Why Codex Commit Safe?
+
+Compared with a generic AI commit-message generator, the extension deliberately keeps a small trust boundary:
+
+- analyzes **staged changes only**;
+- snapshots **HEAD + raw Git index bytes** and discards stale results;
+- uses Codex **Structured Output** and validates the result locally;
+- runs Codex outside the repository with a read-only/minimal-capability configuration;
+- never commits, pushes, or edits source files automatically;
+- fails closed in multi-repository workspaces when the correct SCM input cannot be identified;
+- does not log source code, staged diffs, generated messages, or absolute repository paths.
+
+## Marketplace identity
+
+- Extension name: `codex-commit-safe`
+- Display name: **Codex Commit Safe**
+- Command/settings namespace: `safeCodexCommit.*`
+- Planned extension ID: `jiying2007.codex-commit-safe` (requires the matching Marketplace publisher account)
+
 ## Requirements
 
 - VS Code `1.90.0` or later
@@ -62,7 +84,7 @@ codex --version
 Install a packaged VSIX:
 
 ```bash
-code --install-extension codex-commit-1.1.6.vsix
+code --install-extension codex-commit-safe-1.2.0.vsix
 ```
 
 Or use VS Code:
@@ -74,7 +96,7 @@ Extensions → ... → Install from VSIX...
 After installation, run:
 
 ```text
-Ctrl+Shift+P → Codex Commit: 检查 Codex 环境
+Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
 ```
 
 ## Usage

@@ -232,7 +232,7 @@ const { __test } = require('./extension.js');
   );
   assert.ok(Date.now() - start < 3000);
 
-  console.log('All Codex Commit 1.1.6 unit/regression tests passed.');
+  console.log('All Codex Commit Safe 1.2.0 unit/regression tests passed.');
 })().catch(err => {
   console.error(err);
   process.exit(1);

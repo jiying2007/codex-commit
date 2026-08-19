@@ -3,3 +3,5 @@ node_modules/
 *.zip
 SHA256SUMS
 .DS_Store
+
+.vscode-test/
