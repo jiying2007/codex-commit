@@ -6,12 +6,16 @@ on:
     paths:
       - '.bootstrap/**'
       - '.github/workflows/bootstrap.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   bootstrap:
+    if: github.repository == 'jiying2007/codex-commit'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
