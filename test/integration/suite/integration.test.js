@@ -30,8 +30,7 @@ async function run(){
   await wait(1200);
 
   // Probe the exact Windows .cmd execution path before exercising SCM routing.
-  const own=vscode.extensions.getExtension('jiying2007.codex-commit-safe');
-  const ownExports=own.isActive?own.exports:await own.activate();
+  const ownExports=require('../../../extension.js');
   const versionProbe=await ownExports.__test.runPreparedProcess(fake,['--version'],{timeoutMs:5000});
   console.log('Codex shim version probe:',JSON.stringify(versionProbe));
   assert.match(versionProbe.stdout,/codex-cli fake/);
