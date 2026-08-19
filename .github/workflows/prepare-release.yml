@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   prepare:
@@ -31,8 +31,10 @@ jobs:
           tar -xzf /tmp/release.tar.gz -C .
           rm -rf .release
           sed -i "s/getConfiguration('codexCommit'/getConfiguration('safeCodexCommit'/g" extension.js test/integration/suite/integration.test.js
-          if grep -R "codexCommit" -n extension.js package.json test; then
-            echo "legacy codexCommit namespace remains" >&2
+          sed -i 's/Codex Commit 1\.1\.6 Extension Host integration tests passed\./Codex Commit Safe 1.2.0 Extension Host integration tests passed./g' test/integration/suite/integration.test.js
+          sed -i 's/codex-commit-1\.1\.6\.vsix/codex-commit-safe-1.2.0.vsix/g' README.md
+          if grep -R "codexCommit\|1\.1\.6" -n extension.js package.json test README.md SECURITY.md CHANGELOG.md; then
+            echo "legacy identity/version reference remains" >&2
             exit 1
           fi
 
@@ -73,3 +75,15 @@ jobs:
             codex-commit-safe-1.2.0.vsix
             SHA256SUMS
           if-no-files-found: error
+
+      - name: Commit verified source to release branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- . ':!.github'
+          if ! git diff --cached --quiet; then
+            git commit -m "refactor: rename extension identity"
+            git push origin HEAD:release-1.2.0
+          fi
