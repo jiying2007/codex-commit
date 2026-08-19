@@ -1,0 +1,20 @@
+{
+  "extension.description": "Generate safe, structured Conventional Commit messages from staged Git changes using the local Codex CLI.",
+  "command.generate.title": "Generate Commit Message",
+  "command.regenerate.title": "Regenerate Commit Message",
+  "command.checkEnvironment.title": "Check Codex Environment",
+  "capability.untrusted": "Codex Commit Safe executes Git and the local Codex CLI and reads staged workspace content, so a trusted workspace is required.",
+  "capability.virtual": "Codex Commit Safe requires a local Git repository and local CLI executables.",
+  "config.codexPath": "Codex CLI executable path. Application-scoped: only User Settings can configure it.",
+  "config.model": "Optional Codex model. Application-scoped: only User Settings can configure it.",
+  "config.language": "Language used for the generated commit description and body.",
+  "config.language.zhCN": "Simplified Chinese",
+  "config.language.en": "English",
+  "config.maxDiffBytes": "Maximum staged diff size sent to Codex, in bytes.",
+  "config.subjectMaxLength": "Preferred maximum length of the commit subject line.",
+  "config.maxBodyChars": "Maximum accepted character count for the generated commit message.",
+  "config.scopes": "Preferred Conventional Commit scopes.",
+  "config.autoInferScope": "Infer a preferred scope from staged paths.",
+  "config.extraInstructions": "Team-specific instructions appended to the generation prompt. Workspace/project values are treated as untrusted prompt data.",
+  "config.timeoutSeconds": "Maximum time to wait for Codex CLI."
+}

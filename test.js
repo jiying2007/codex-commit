@@ -2,16 +2,16 @@
 
 const Module = require('module');
 const originalLoad = Module._load;
+const fakeVscode = {
+  env: { language: 'en' },
+  workspace: {},
+  window: {},
+  extensions: {},
+  scm: {},
+  CancellationTokenSource: class {}
+};
 Module._load = function(request, parent, isMain) {
-  if (request === 'vscode') {
-    return {
-      workspace: {},
-      window: {},
-      extensions: {},
-      scm: {},
-      CancellationTokenSource: class {}
-    };
-  }
+  if (request === 'vscode') return fakeVscode;
   return originalLoad.apply(this, arguments);
 };
 
@@ -20,13 +20,44 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { __test } = require('./extension.js');
+const pkg = require('./package.json');
+
+function spawnGit(args, cwd) {
+  const r = require('child_process').spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(r.stderr || r.stdout);
+  return r.stdout.trim();
+}
 
 (async () => {
-  // Scope inference
+  // Runtime UI localization is independent from generated commit language.
+  fakeVscode.env.language = 'en';
+  assert.strictEqual(__test.ui('中文', 'English'), 'English');
+  fakeVscode.env.language = 'zh-cn';
+  assert.strictEqual(__test.ui('中文', 'English'), '中文');
+  fakeVscode.env.language = 'en';
+
+  // Manifest NLS: all package.json placeholders must exist in both English and Chinese catalogs.
+  const manifestText = fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8');
+  const nlsEn = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.nls.json'), 'utf8'));
+  const nlsZh = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.nls.zh-cn.json'), 'utf8'));
+  const placeholders = [...manifestText.matchAll(/%([^%]+)%/g)].map(m => m[1]);
+  assert.ok(placeholders.length > 0);
+  for (const key of placeholders) {
+    assert.ok(Object.hasOwn(nlsEn, key), `missing English NLS key: ${key}`);
+    assert.ok(Object.hasOwn(nlsZh, key), `missing Chinese NLS key: ${key}`);
+  }
+
+  // Generated Commit Message language is explicitly selectable.
+  const promptZh = __test.buildPrompt({ language: 'zh-CN', subjectMaxLength: 72, scopes: [], extraInstructions: '' }, '', '');
+  const promptEn = __test.buildPrompt({ language: 'en', subjectMaxLength: 72, scopes: [], extraInstructions: '' }, '', '');
+  assert.match(promptZh, /Use Simplified Chinese/);
+  assert.match(promptEn, /Use English/);
+
+  // Scope inference.
   assert.strictEqual(__test.inferScope(['modules/wifi/wowl.c'], ['wifi', 'motor']), 'wifi');
   assert.strictEqual(__test.inferScope(['wifi/a.c', 'motor/b.c'], ['wifi', 'motor']), '');
 
-  // Scope validation
+  // Scope validation.
   assert.deepStrictEqual(__test.validateScopes(['wifi', 'wifi', 'motor'], []), ['wifi', 'motor']);
   assert.throws(() => __test.validateScopes(['BAD SCOPE'], []));
   assert.throws(() => __test.validateScopes(Array.from({ length: 65 }, (_, i) => `s${i}`), []));
@@ -42,36 +73,28 @@ const { __test } = require('./extension.js');
       };
     }
   };
-  assert.strictEqual(
-    __test.getUserOnlySetting(fakeConfig, 'codexPath', 'codex'),
-    '/usr/local/bin/codex'
-  );
+  assert.strictEqual(__test.getUserOnlySetting(fakeConfig, 'codexPath', 'codex'), '/usr/local/bin/codex');
 
-  // Output schema
+  // Output schema.
   const schema = __test.outputSchema();
   assert.strictEqual(schema.additionalProperties, false);
   assert.deepStrictEqual(schema.required.sort(), ['body', 'description', 'scope', 'type']);
 
-  // JSONL parsing
+  // JSONL parsing.
   const jsonl = [
     JSON.stringify({ type: 'thread.started', thread_id: 'x' }),
     JSON.stringify({
       type: 'item.completed',
       item: {
         type: 'agent_message',
-        text: JSON.stringify({
-          type: 'fix',
-          scope: 'wifi',
-          description: '修复唤醒异常',
-          body: []
-        })
+        text: JSON.stringify({ type: 'fix', scope: 'wifi', description: '修复唤醒异常', body: [] })
       }
     })
   ].join('\n');
   assert.strictEqual(JSON.parse(__test.parseCodexJsonl(jsonl)).scope, 'wifi');
   assert.throws(() => __test.parseCodexJsonl('not-json'));
 
-  // Structured result + formatting
+  // Structured result + formatting.
   const options = { subjectMaxLength: 72, maxBodyChars: 2000 };
   const structured = __test.validateStructuredResult({
     type: 'feat',
@@ -83,22 +106,15 @@ const { __test } = require('./extension.js');
     __test.formatCommitMessage(structured, options),
     'feat(motor): 增加三相短接停机模式\n\n- 增加停机模式切换接口\n- 优化零速处理'
   );
-  assert.throws(() => __test.validateStructuredResult({
-    type: 'bad', scope: '', description: 'x', body: []
-  }));
+  assert.throws(() => __test.validateStructuredResult({ type: 'bad', scope: '', description: 'x', body: [] }));
 
   // Project rules whitelist, malformed file and symlink protection.
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-test-'));
   try {
-    fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({
-      language: 'zh-CN',
-      scopes: ['wifi']
-    }));
+    fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({ language: 'zh-CN', scopes: ['wifi'] }));
     assert.deepStrictEqual(__test.readProjectRules(temp).scopes, ['wifi']);
 
-    fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({
-      codexPath: '/tmp/evil'
-    }));
+    fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({ codexPath: '/tmp/evil' }));
     assert.throws(() => __test.readProjectRules(temp));
 
     fs.writeFileSync(path.join(temp, '.codex-commit.json'), '{bad json');
@@ -115,31 +131,36 @@ const { __test } = require('./extension.js');
   }
 
   // CLI compatibility classification must not treat generic "invalid value" as version mismatch.
-  assert.strictEqual(
-    __test.isCliCompatibilityError({ stderr: 'error: unexpected argument --output-schema' }),
-    true
-  );
-  assert.strictEqual(
-    __test.isCliCompatibilityError({ stderr: 'error: invalid value for model' }),
-    false
-  );
+  assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: unexpected argument --output-schema' }), true);
+  assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: invalid value for model' }), false);
+
+  // Explicit Codex paths fail closed when --version fails instead of being accepted with an empty version.
+  if (process.platform !== 'win32') {
+    const cliDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-cli-'));
+    try {
+      const good = path.join(cliDir, 'good-codex');
+      const bad = path.join(cliDir, 'bad-codex');
+      fs.writeFileSync(good, '#!/bin/sh\necho "codex-cli 9.9.9"\n');
+      fs.writeFileSync(bad, '#!/bin/sh\necho "broken" >&2\nexit 7\n');
+      fs.chmodSync(good, 0o755);
+      fs.chmodSync(bad, 0o755);
+      const resolved = await __test.resolveCodexExecutable(good);
+      assert.strictEqual(resolved.executable, good);
+      assert.match(resolved.version, /9\.9\.9/);
+      await assert.rejects(__test.resolveCodexExecutable(bad), err => err.code === 'ECODEXUNUSABLE');
+    } finally {
+      fs.rmSync(cliDir, { recursive: true, force: true });
+    }
+  }
 
   // SCM command-context repository selection helper.
-  const repos = [
-    { root: path.resolve('/tmp/r1') },
-    { root: path.resolve('/tmp/r2') }
-  ];
-  const selected = __test.repositoryFromCommandContext(repos, [{
-    rootUri: { fsPath: path.resolve('/tmp/r2') }
-  }]);
+  const repos = [{ root: path.resolve('/tmp/r1') }, { root: path.resolve('/tmp/r2') }];
+  const selected = __test.repositoryFromCommandContext(repos, [{ rootUri: { fsPath: path.resolve('/tmp/r2') } }]);
   assert.strictEqual(selected, repos[1]);
 
   // Body items are normalized to a single line.
   const normalizedBody = __test.validateStructuredResult({
-    type: 'fix',
-    scope: 'wifi',
-    description: '修复问题',
-    body: ['第一行\n第二行\t第三行']
+    type: 'fix', scope: 'wifi', description: '修复问题', body: ['第一行\n第二行\t第三行']
   });
   assert.deepStrictEqual(normalizedBody.body, ['第一行 第二行 第三行']);
 
@@ -153,25 +174,18 @@ const { __test } = require('./extension.js');
   if (process.platform !== 'win32') {
     const rawRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-rawpath-'));
     try {
-      const git = (args) => {
-        const r = require('child_process').spawnSync('git', args, {
-          cwd: rawRepo,
-          encoding: 'utf8'
-        });
-        if (r.status !== 0) throw new Error(r.stderr || r.stdout);
-      };
-      git(['init']);
+      spawnGit(['init'], rawRepo);
       const rawName = Buffer.concat([
         Buffer.from(rawRepo + path.sep),
         Buffer.from([0x66, 0x6f, 0x80, 0x6f, 0x2e, 0x63])
       ]);
       fs.writeFileSync(rawName, 'int x = 1;\n');
-      git(['add', '-A']);
+      spawnGit(['add', '-A'], rawRepo);
       const fp1 = await __test.getIndexFingerprint(rawRepo);
       const fp2 = await __test.getIndexFingerprint(rawRepo);
       assert.strictEqual(fp1, fp2);
       fs.writeFileSync(rawName, 'int x = 2;\n');
-      git(['add', '-A']);
+      spawnGit(['add', '-A'], rawRepo);
       const fp3 = await __test.getIndexFingerprint(rawRepo);
       assert.notStrictEqual(fp1, fp3);
     } finally {
@@ -179,31 +193,20 @@ const { __test } = require('./extension.js');
     }
   }
 
-  // Repository snapshot tracks both HEAD and INDEX.
+  // Repository snapshot tracks both HEAD and INDEX, including unborn HEAD.
   const snapshotRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-snapshot-'));
   try {
-    const git = (args) => {
-      const r = require('child_process').spawnSync('git', args, {
-        cwd: snapshotRepo,
-        encoding: 'utf8'
-      });
-      if (r.status !== 0) throw new Error(r.stderr || r.stdout);
-      return r.stdout.trim();
-    };
-    git(['init']);
-    git(['config', 'user.email', 'test@example.com']);
-    git(['config', 'user.name', 'Codex Commit Test']);
+    spawnGit(['init'], snapshotRepo);
+    spawnGit(['config', 'user.email', 'test@example.com'], snapshotRepo);
+    spawnGit(['config', 'user.name', 'Codex Commit Test'], snapshotRepo);
     fs.writeFileSync(path.join(snapshotRepo, 'a.c'), 'int a = 1;\n');
-    git(['add', 'a.c']);
+    spawnGit(['add', 'a.c'], snapshotRepo);
 
     const unborn = await __test.getRepositorySnapshot(snapshotRepo);
     assert.strictEqual(unborn.headOid, '<unborn>');
-
-    git(['commit', '-m', 'initial']);
+    spawnGit(['commit', '-m', 'initial'], snapshotRepo);
     const committed = await __test.getRepositorySnapshot(snapshotRepo);
     assert.notStrictEqual(committed.headOid, '<unborn>');
-    // The commit can advance HEAD while INDEX remains identical. The combined
-    // repository snapshot must still detect that state transition.
     assert.strictEqual(unborn.indexFingerprint, committed.indexFingerprint);
     assert.strictEqual(__test.repositorySnapshotsEqual(unborn, committed), false);
   } finally {
@@ -212,27 +215,21 @@ const { __test } = require('./extension.js');
 
   // Process output limit protection.
   await assert.rejects(
-    __test.runProcess(
-      process.execPath,
-      ['-e', 'process.stdout.write("x".repeat(1024 * 1024))'],
-      { timeoutMs: 5000, maxStdoutBytes: 4096 }
-    ),
+    __test.runProcess(process.execPath, ['-e', 'process.stdout.write("x".repeat(1024 * 1024))'], {
+      timeoutMs: 5000, maxStdoutBytes: 4096
+    }),
     err => err.code === 'EOUTPUTLIMIT'
   );
 
-  // Process timeout
+  // Process timeout.
   const start = Date.now();
   await assert.rejects(
-    __test.runProcess(
-      process.execPath,
-      ['-e', 'setTimeout(()=>{}, 5000)'],
-      { timeoutMs: 100 }
-    ),
+    __test.runProcess(process.execPath, ['-e', 'setTimeout(()=>{}, 5000)'], { timeoutMs: 100 }),
     err => err.code === 'ETIMEDOUT'
   );
   assert.ok(Date.now() - start < 3000);
 
-  console.log('All Codex Commit Safe 1.2.0 unit/regression tests passed.');
+  console.log(`All Codex Commit Safe ${pkg.version} unit/regression tests passed.`);
 })().catch(err => {
   console.error(err);
   process.exit(1);
