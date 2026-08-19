@@ -124,7 +124,7 @@ function prepareCommand(command, args) {
   if (!isWindowsScript(command)) {
     return { command, args, shell: false };
   }
-  const commandLine = [quoteWindowsCmdArg(command), ...args.map(quoteWindowsCmdArg)].join(' ');
+  const commandLine = '"' + [quoteWindowsCmdArg(command), ...args.map(quoteWindowsCmdArg)].join(' ') + '"';
   return {
     command: process.env.ComSpec || 'cmd.exe',
     args: ['/d', '/s', '/c', commandLine],
