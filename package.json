@@ -1,0 +1,193 @@
+{
+  "name": "codex-commit",
+  "displayName": "Codex Commit",
+  "description": "Generate safe, structured Chinese Conventional Commit messages from staged Git changes using the local Codex CLI.",
+  "version": "1.1.6",
+  "publisher": "internal",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "commit",
+    "codex",
+    "conventional commits",
+    "ai"
+  ],
+  "activationEvents": [
+    "onCommand:codexCommit.generate",
+    "onCommand:codexCommit.regenerate",
+    "onCommand:codexCommit.checkEnvironment"
+  ],
+  "main": "./extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Codex Commit executes Git and the local Codex CLI and reads staged workspace content, so a trusted workspace is required."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Codex Commit requires a local Git repository and local CLI executables."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "codexCommit.generate",
+        "title": "生成 Commit Message",
+        "category": "Codex Commit",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "codexCommit.regenerate",
+        "title": "重新生成 Commit Message",
+        "category": "Codex Commit",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codexCommit.checkEnvironment",
+        "title": "检查 Codex 环境",
+        "category": "Codex Commit",
+        "icon": "$(check)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "codexCommit.generate",
+          "when": "scmProvider == git && isWorkspaceTrusted",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codexCommit.regenerate",
+          "when": "scmProvider == git && isWorkspaceTrusted",
+          "group": "navigation@6"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codexCommit.generate",
+          "when": "workspaceFolderCount > 0 && isWorkspaceTrusted"
+        },
+        {
+          "command": "codexCommit.regenerate",
+          "when": "workspaceFolderCount > 0 && isWorkspaceTrusted"
+        },
+        {
+          "command": "codexCommit.checkEnvironment",
+          "when": "isWorkspaceTrusted"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codex Commit",
+      "properties": {
+        "codexCommit.codexPath": {
+          "type": "string",
+          "default": "codex",
+          "scope": "application",
+          "description": "Codex CLI executable path. Application-scoped: only User Settings can configure it."
+        },
+        "codexCommit.model": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "Optional Codex model. Application-scoped: only User Settings can configure it."
+        },
+        "codexCommit.language": {
+          "type": "string",
+          "enum": [
+            "zh-CN",
+            "en"
+          ],
+          "default": "zh-CN",
+          "description": "Language for commit description and body."
+        },
+        "codexCommit.maxDiffBytes": {
+          "type": "number",
+          "default": 262144,
+          "minimum": 4096,
+          "maximum": 2097152,
+          "description": "Maximum staged diff size sent to Codex, in bytes."
+        },
+        "codexCommit.subjectMaxLength": {
+          "type": "number",
+          "default": 72,
+          "minimum": 30,
+          "maximum": 120,
+          "description": "Preferred maximum length of the first line."
+        },
+        "codexCommit.maxBodyChars": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 200,
+          "maximum": 10000,
+          "description": "Maximum accepted character count for the generated commit message."
+        },
+        "codexCommit.scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "bsp",
+            "driver",
+            "wifi",
+            "audio",
+            "motor",
+            "imu",
+            "ota",
+            "mcu",
+            "nand",
+            "power",
+            "camera",
+            "system"
+          ],
+          "description": "Preferred Conventional Commit scopes."
+        },
+        "codexCommit.autoInferScope": {
+          "type": "boolean",
+          "default": true,
+          "description": "Infer a preferred scope from staged paths."
+        },
+        "codexCommit.extraInstructions": {
+          "type": "string",
+          "default": "",
+          "description": "Team-specific instructions appended to the generation prompt. Workspace/project values are allowed and treated as untrusted prompt data."
+        },
+        "codexCommit.timeoutSeconds": {
+          "type": "number",
+          "default": 90,
+          "minimum": 10,
+          "maximum": 300,
+          "description": "Maximum time to wait for Codex CLI."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "node --check extension.js && node test.js",
+    "test:unit": "node test.js",
+    "test:integration": "node ./test/integration/runTest.js",
+    "test": "npm run test:unit",
+    "package": "vsce package --no-dependencies",
+    "verify:lock": "node ./scripts/verify-lock.js",
+    "ci": "npm run verify:lock && npm ci --ignore-scripts && npm run check && npm run test:integration && npm run package"
+  },
+  "devDependencies": {
+    "@vscode/test-electron": "3.0.0",
+    "@vscode/vsce": "3.9.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jiying2007/codex-commit.git"
+  },
+  "homepage": "https://github.com/jiying2007/codex-commit#readme",
+  "bugs": {
+    "url": "https://github.com/jiying2007/codex-commit/issues"
+  }
+}

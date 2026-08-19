@@ -1,0 +1,23 @@
+{
+  "language": "zh-CN",
+  "subjectMaxLength": 72,
+  "maxDiffBytes": 262144,
+  "maxBodyChars": 2000,
+  "scopes": [
+    "bsp",
+    "driver",
+    "wifi",
+    "audio",
+    "motor",
+    "imu",
+    "ota",
+    "mcu",
+    "nand",
+    "power",
+    "camera",
+    "system"
+  ],
+  "autoInferScope": true,
+  "extraInstructions": "修复缺陷优先使用 fix；新增功能使用 feat；一次提交只表达一个逻辑目的。",
+  "timeoutSeconds": 90
+}
