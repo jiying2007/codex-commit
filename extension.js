@@ -128,7 +128,8 @@ function prepareCommand(command, args) {
   return {
     command: process.env.ComSpec || 'cmd.exe',
     args: ['/d', '/s', '/c', commandLine],
-    shell: false
+    shell: false,
+    windowsVerbatimArguments: true
   };
 }
 
@@ -137,7 +138,11 @@ function runPreparedProcess(command, args, options = {}, stdinText = '', cancell
   return runProcess(
     prepared.command,
     prepared.args,
-    { ...options, shell: false },
+    {
+      ...options,
+      shell: false,
+      windowsVerbatimArguments: prepared.windowsVerbatimArguments === true
+    },
     stdinText,
     cancellationToken
   );
@@ -212,6 +217,7 @@ function runProcess(command, args, options = {}, stdinText = '', cancellationTok
         env: options.env || process.env,
         windowsHide: true,
         shell: options.shell === true,
+        windowsVerbatimArguments: options.windowsVerbatimArguments === true,
         detached: process.platform !== 'win32'
       });
     } catch (error) {
