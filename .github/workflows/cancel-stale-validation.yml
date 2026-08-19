@@ -1,0 +1,23 @@
+name: Cancel stale validation runs
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cancel:
+    if: github.event.issue.title == '[internal] cancel stale codex-commit validation runs'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel stale runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run cancel 32275581641 --repo "$GITHUB_REPOSITORY" || true
+          gh run cancel 32277420988 --repo "$GITHUB_REPOSITORY" || true
