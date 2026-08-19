@@ -78,11 +78,17 @@ jobs:
           cache: npm
       - run: npm run verify:lock
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Install Linux Extension Host dependencies
+      - name: Ensure Linux Extension Host dependencies
         if: runner.os == 'Linux'
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+          set -euo pipefail
+          if command -v xvfb-run >/dev/null 2>&1 && ldconfig -p | grep -q 'libgtk-3.so' && ldconfig -p | grep -q 'libnss3.so'; then
+            echo 'Extension Host dependencies already available.'
+          else
+            sudo apt-get update
+            sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+          fi
       - name: Run Extension Host integration tests on Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration
@@ -106,9 +112,16 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+      - name: Ensure Linux Extension Host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v xvfb-run >/dev/null 2>&1 && ldconfig -p | grep -q 'libgtk-3.so' && ldconfig -p | grep -q 'libnss3.so'; then
+            echo 'Extension Host dependencies already available.'
+          else
+            sudo apt-get update
+            sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+          fi
       - run: xvfb-run -a npm run test:integration
 
   package-verify:
