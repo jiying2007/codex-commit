@@ -1,8 +1,8 @@
 {
   "name": "codex-commit-safe",
   "displayName": "Codex Commit Safe",
-  "description": "Generate safe, structured Conventional Commit messages from staged Git changes using the local Codex CLI.",
-  "version": "1.2.0",
+  "description": "%extension.description%",
+  "version": "1.2.1",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -31,30 +31,30 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
-      "description": "Codex Commit executes Git and the local Codex CLI and reads staged workspace content, so a trusted workspace is required."
+      "description": "%capability.untrusted%"
     },
     "virtualWorkspaces": {
       "supported": false,
-      "description": "Codex Commit requires a local Git repository and local CLI executables."
+      "description": "%capability.virtual%"
     }
   },
   "contributes": {
     "commands": [
       {
         "command": "safeCodexCommit.generate",
-        "title": "生成 Commit Message",
+        "title": "%command.generate.title%",
         "category": "Codex Commit Safe",
         "icon": "$(sparkle)"
       },
       {
         "command": "safeCodexCommit.regenerate",
-        "title": "重新生成 Commit Message",
+        "title": "%command.regenerate.title%",
         "category": "Codex Commit Safe",
         "icon": "$(refresh)"
       },
       {
         "command": "safeCodexCommit.checkEnvironment",
-        "title": "检查 Codex 环境",
+        "title": "%command.checkEnvironment.title%",
         "category": "Codex Commit Safe",
         "icon": "$(check)"
       }
@@ -94,13 +94,13 @@
           "type": "string",
           "default": "codex",
           "scope": "application",
-          "description": "Codex CLI executable path. Application-scoped: only User Settings can configure it."
+          "description": "%config.codexPath%"
         },
         "safeCodexCommit.model": {
           "type": "string",
           "default": "",
           "scope": "application",
-          "description": "Optional Codex model. Application-scoped: only User Settings can configure it."
+          "description": "%config.model%"
         },
         "safeCodexCommit.language": {
           "type": "string",
@@ -109,28 +109,32 @@
             "en"
           ],
           "default": "zh-CN",
-          "description": "Language for commit description and body."
+          "description": "%config.language%",
+          "enumDescriptions": [
+            "%config.language.zhCN%",
+            "%config.language.en%"
+          ]
         },
         "safeCodexCommit.maxDiffBytes": {
           "type": "number",
           "default": 262144,
           "minimum": 4096,
           "maximum": 2097152,
-          "description": "Maximum staged diff size sent to Codex, in bytes."
+          "description": "%config.maxDiffBytes%"
         },
         "safeCodexCommit.subjectMaxLength": {
           "type": "number",
           "default": 72,
           "minimum": 30,
           "maximum": 120,
-          "description": "Preferred maximum length of the first line."
+          "description": "%config.subjectMaxLength%"
         },
         "safeCodexCommit.maxBodyChars": {
           "type": "number",
           "default": 2000,
           "minimum": 200,
           "maximum": 10000,
-          "description": "Maximum accepted character count for the generated commit message."
+          "description": "%config.maxBodyChars%"
         },
         "safeCodexCommit.scopes": {
           "type": "array",
@@ -151,24 +155,24 @@
             "camera",
             "system"
           ],
-          "description": "Preferred Conventional Commit scopes."
+          "description": "%config.scopes%"
         },
         "safeCodexCommit.autoInferScope": {
           "type": "boolean",
           "default": true,
-          "description": "Infer a preferred scope from staged paths."
+          "description": "%config.autoInferScope%"
         },
         "safeCodexCommit.extraInstructions": {
           "type": "string",
           "default": "",
-          "description": "Team-specific instructions appended to the generation prompt. Workspace/project values are allowed and treated as untrusted prompt data."
+          "description": "%config.extraInstructions%"
         },
         "safeCodexCommit.timeoutSeconds": {
           "type": "number",
           "default": 90,
           "minimum": 10,
           "maximum": 300,
-          "description": "Maximum time to wait for Codex CLI."
+          "description": "%config.timeoutSeconds%"
         }
       }
     }

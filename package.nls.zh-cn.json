@@ -1,0 +1,20 @@
+{
+  "extension.description": "使用本地 Codex CLI，根据 Git 暂存区变更安全生成结构化 Conventional Commit Message。",
+  "command.generate.title": "生成 Commit Message",
+  "command.regenerate.title": "重新生成 Commit Message",
+  "command.checkEnvironment.title": "检查 Codex 环境",
+  "capability.untrusted": "Codex Commit Safe 会执行 Git 和本地 Codex CLI，并读取暂存区内容，因此要求受信任工作区。",
+  "capability.virtual": "Codex Commit Safe 需要本地 Git 仓库和本地 CLI 可执行文件。",
+  "config.codexPath": "Codex CLI 可执行文件路径。应用级设置：仅允许 User Settings 配置。",
+  "config.model": "可选 Codex 模型。应用级设置：仅允许 User Settings 配置。",
+  "config.language": "生成的 Commit description 和 body 使用的语言。",
+  "config.language.zhCN": "简体中文",
+  "config.language.en": "英文",
+  "config.maxDiffBytes": "发送给 Codex 的最大 staged diff 大小（字节）。",
+  "config.subjectMaxLength": "Commit 首行建议最大长度。",
+  "config.maxBodyChars": "生成的 Commit Message 允许的最大字符数。",
+  "config.scopes": "推荐使用的 Conventional Commit scope。",
+  "config.autoInferScope": "根据暂存文件路径推断推荐 scope。",
+  "config.extraInstructions": "附加到生成提示词的团队规则。工作区/项目值均按不可信提示数据处理。",
+  "config.timeoutSeconds": "等待 Codex CLI 的最长时间。"
+}
