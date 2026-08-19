@@ -10,7 +10,7 @@ function exec(command, args, cwd) {
   const r = spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
-    shell: process.platform === 'win32'
+    shell: false
   });
   if (r.status !== 0) throw new Error(r.stderr || r.stdout);
 }
