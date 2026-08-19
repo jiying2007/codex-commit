@@ -53,3 +53,86 @@ jobs:
           git add -A
           git commit -m 'release: prepare Codex Commit Safe 1.2.1'
           git push origin HEAD:maintenance-1.2.1
+
+  integration-latest:
+    name: Extension Host / ${{ matrix.os }} latest
+    needs: apply
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: maintenance-1.2.1
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm run verify:lock
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install Linux Extension Host dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+      - name: Run Extension Host integration tests on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration
+      - name: Run Extension Host integration tests
+        if: runner.os != 'Linux'
+        run: npm run test:integration
+
+  integration-minimum:
+    name: Extension Host / VS Code 1.90.0 minimum
+    needs: apply
+    runs-on: ubuntu-latest
+    env:
+      VSCODE_TEST_VERSION: 1.90.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: maintenance-1.2.1
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+      - run: xvfb-run -a npm run test:integration
+
+  package-verify:
+    name: Official VSIX / bilingual content
+    needs: [integration-latest, integration-minimum]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: maintenance-1.2.1
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run package
+      - name: Verify packaged content
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          vsix="codex-commit-safe-${version}.vsix"
+          unzip -l "$vsix" > /tmp/vsix.list
+          grep -F 'extension/package.nls.json' /tmp/vsix.list
+          grep -F 'extension/package.nls.zh-cn.json' /tmp/vsix.list
+          grep -F 'extension/README.zh-CN.md' /tmp/vsix.list
+          if grep -E 'extension/(test|scripts|package-lock\.json|\.gitignore|\.gitattributes)(/|$)' /tmp/vsix.list; then
+            echo 'VSIX contains development-only files.' >&2
+            exit 1
+          fi
+          sha256sum "$vsix" > SHA256SUMS
