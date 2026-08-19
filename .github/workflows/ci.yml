@@ -17,7 +17,62 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check JavaScript syntax
-        run: node --check extension.js
-      - name: Run unit and regression tests
-        run: node test.js
+          cache: npm
+      - run: npm run verify:lock
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run check
+
+  integration-linux:
+    name: Extension Host / Linux
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install Extension Host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2
+      - run: xvfb-run -a npm run test:integration
+
+  integration-windows:
+    name: Extension Host / Windows
+    needs: unit
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:integration
+
+  package:
+    name: Official VSIX package
+    needs: [integration-linux, integration-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run package
+      - name: Create SHA256
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          sha256sum "codex-commit-safe-${version}.vsix" > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-commit-safe-${{ github.sha }}
+          path: |
+            codex-commit-safe-*.vsix
+            SHA256SUMS
+          if-no-files-found: error
