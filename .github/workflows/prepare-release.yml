@@ -76,14 +76,45 @@ jobs:
             SHA256SUMS
           if-no-files-found: error
 
-      - name: Commit verified source to release branch
+      - name: Persist verified non-workflow source via GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- . ':!.github'
-          if ! git diff --cached --quiet; then
-            git commit -m "refactor: rename extension identity"
-            git push origin HEAD:release-1.2.0
-          fi
+          upload_file() {
+            local file="$1"
+            local encoded sha
+            encoded=$(base64 -w0 "$file")
+            sha=$(gh api "repos/${GITHUB_REPOSITORY}/contents/${file}?ref=release-1.2.0" --jq '.sha' 2>/dev/null || true)
+            if [ -n "$sha" ]; then
+              gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${file}" \
+                -f message='refactor: rename extension identity' \
+                -f branch='release-1.2.0' \
+                -f content="$encoded" \
+                -f sha="$sha" >/dev/null
+            else
+              gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${file}" \
+                -f message='refactor: rename extension identity' \
+                -f branch='release-1.2.0' \
+                -f content="$encoded" >/dev/null
+            fi
+          }
+
+          while IFS= read -r file; do
+            upload_file "$file"
+          done < <(find . -type f \
+            ! -path './.git/*' \
+            ! -path './.github/*' \
+            ! -path './node_modules/*' \
+            ! -name '*.vsix' \
+            ! -name 'SHA256SUMS' \
+            -printf '%P\n' | sort)
+
+          for file in $(gh api "repos/${GITHUB_REPOSITORY}/contents/.release?ref=release-1.2.0" --jq '.[].path' 2>/dev/null || true); do
+            sha=$(gh api "repos/${GITHUB_REPOSITORY}/contents/${file}?ref=release-1.2.0" --jq '.sha')
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/contents/${file}" \
+              -f message='chore: remove release scaffolding' \
+              -f branch='release-1.2.0' \
+              -f sha="$sha" >/dev/null
+          done
