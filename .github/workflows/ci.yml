@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   test-rethrow-patch:
-    if: github.event_name == 'pull_request' && github.head_ref == 'trigger-test-rethrow'
+    if: github.event_name == 'pull_request' && github.head_ref == 'trigger-test-rethrow-2'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
