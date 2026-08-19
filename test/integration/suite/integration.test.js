@@ -6,7 +6,7 @@ const {spawnSync}=require('child_process');
 const vscode=require('vscode');
 
 function exec(command,args,cwd){
-  const r=spawnSync(command,args,{cwd,encoding:'utf8',shell:process.platform==='win32'});
+  const r=spawnSync(command,args,{cwd,encoding:'utf8',shell:false});
   if(r.status!==0)throw new Error(r.stderr||r.stdout);
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -68,7 +68,6 @@ async function run(){
   await Promise.all([a,b]);
   assert.match(r1.inputBox.value,/^fix\(wifi\): /);
 
-
   // collection-window TOCTOU: index changes after first fingerprint but before diff read.
   r1.inputBox.value='';
   process.env.CODEX_COMMIT_TEST_COLLECTION_DELAY_MS='300';
@@ -97,6 +96,5 @@ async function run(){
   assert.strictEqual(r1.inputBox.value,'');
 
   console.log('Codex Commit Safe 1.2.0 Extension Host integration tests passed.');
-
 }
 module.exports={run};
