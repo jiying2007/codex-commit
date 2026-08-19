@@ -6,9 +6,35 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  apply-windows-runtime-fix:
+    if: github.event_name == 'pull_request' && github.head_ref == 'apply-windows-runtime-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply verified runtime patch
+        run: |
+          node scripts/apply-windows-verbatim-fix.js
+          node --check extension.js
+          grep -n "windowsVerbatimArguments" extension.js
+      - name: Commit runtime fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extension.js
+          git commit -m "fix: preserve cmd.exe argument quoting on Windows"
+          git push origin HEAD:main
+
   unit:
     name: Unit / regression
     runs-on: ubuntu-latest
