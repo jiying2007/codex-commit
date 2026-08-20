@@ -9,17 +9,13 @@ on:
         description: 'Git tag to publish, for example v1.2.1'
         required: true
         default: 'v1.2.1'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/marketplace.yml'
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: vscode-marketplace-${{ github.event.release.tag_name || inputs.tag || 'v1.2.1' }}
+  group: vscode-marketplace-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -27,7 +23,6 @@ jobs:
     name: Publish to VS Code Marketplace
     runs-on: ubuntu-latest
     env:
-      BOOTSTRAP_TAG: v1.2.1
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
       - name: Resolve immutable release tag
@@ -37,10 +32,8 @@ jobs:
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
             tag='${{ github.event.release.tag_name }}'
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            tag='${{ inputs.tag }}'
           else
-            tag="$BOOTSTRAP_TAG"
+            tag='${{ inputs.tag }}'
           fi
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "tag must be vMAJOR.MINOR.PATCH: $tag" >&2
@@ -97,7 +90,7 @@ jobs:
             echo 'Publishing with VSCE_PAT using stable @vscode/vsce 3.9.2.'
             ./node_modules/.bin/vsce publish --packagePath "$vsix" --pat "$VSCE_PAT" --skip-duplicate
           else
-            echo 'VSCE_PAT is not configured; attempting GitHub OIDC Trusted Publishing.'
-            echo 'Marketplace policy must match: jiying2007/codex-commit + workflow marketplace.yml.'
+            echo 'VSCE_PAT is not configured; using GitHub OIDC Trusted Publishing.'
+            echo 'Marketplace policy must match publisher jiying2007, repository jiying2007/codex-commit, workflow marketplace.yml.'
             npx --yes @vscode/vsce@3.9.3-5 publish --packagePath "$vsix" --oidc --skip-duplicate
           fi
