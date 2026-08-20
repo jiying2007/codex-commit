@@ -1,0 +1,37 @@
+name: Cleanup Scope Intelligence v1.3.0
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cleanup:
+    if: github.head_ref == 'cleanup-scope-intelligence-v1.3.0-trigger' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Remove temporary workflow and branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/cleanup-scope-intelligence-v1.3.0.yml
+          git commit -m 'build: remove one-time Scope Intelligence cleanup'
+          git push origin HEAD:main
+          gh pr close "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" || true
+          git push origin --delete feat/scope-intelligence-v1.3.0 || true
+          git push origin --delete cleanup-scope-intelligence-v1.3.0-trigger || true
