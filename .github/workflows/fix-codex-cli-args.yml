@@ -1,3 +1,4 @@
+# One-time bootstrap trigger for the 1.2.2 compatibility patch.
 name: Fix Codex CLI argument layout
 
 on:
