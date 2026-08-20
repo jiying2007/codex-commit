@@ -76,7 +76,9 @@ process.stdin.on('end',()=>{
 `);
   if (process.platform === 'win32') {
     const cmd = path.join(base, 'fake-codex.cmd');
-    fs.writeFileSync(cmd, `@echo off\r\n"${process.execPath}" "${js}" %*\r\n`);
+    const nodeForBatch = process.execPath.replace(/%/g, '%%');
+    const jsForBatch = js.replace(/%/g, '%%');
+    fs.writeFileSync(cmd, `@echo off\r\n"${nodeForBatch}" "${jsForBatch}" %*\r\n`);
     return cmd;
   }
   const sh = path.join(base, 'fake-codex');
