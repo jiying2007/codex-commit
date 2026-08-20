@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1
+
+Scope Intelligence maintenance release.
+
+- Ignore VS Code `scopeHints` that are no longer relevant when a repository replaces the effective `scopes` list, instead of failing generation.
+- Keep repository-owned `scopeHints` fail-closed when they reference scopes not declared by the repository's effective scope configuration.
+- Finalize the post-1.3.0 Scope Intelligence compatibility and repository-cleanup baseline without changing the core scoring model.
+
 ## 1.3.0
 
 Scope Intelligence release.
@@ -8,7 +16,6 @@ Scope Intelligence release.
 - Add dominance, margin, confidence, and strong-evidence gates so ambiguous or mixed-subsystem changes intentionally produce no local preferred scope.
 - Add bounded project/VS Code `scopeHints` for custom domain aliases without executable rules or regexes.
 - Keep `scopeHints` local-only: repository hints extend applicable VS Code hints deterministically for heuristic scoring and are not inserted into the Codex prompt.
-- Ignore configured hints that become irrelevant when a repository replaces the effective scope list, while keeping repository-owned hint/scope mismatches fail-closed.
 - Add optional `scopePolicy` (`flexible` / `strict`); strict mode is enforced in both Structured Output schema and local validation.
 - Add privacy-safe scope inference diagnostics that report only scores/confidence, never paths or diff content.
 - Add a table-driven scope regression corpus covering low power, camera, Wi-Fi, mixed changes, add/delete weighting, hunk symbols, and custom scopes.
