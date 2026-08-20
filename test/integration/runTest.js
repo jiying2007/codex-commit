@@ -26,6 +26,12 @@ function fakeCodex(base, delayFile) {
 const fs=require('fs');
 const args=process.argv.slice(2);
 if(args.includes('--version')){console.log('codex-cli fake');process.exit(0);}
+const execIndex=args.indexOf('exec');
+const approvalIndex=args.indexOf('--ask-for-approval');
+if(execIndex<0||approvalIndex<0||approvalIndex>execIndex){
+  console.error('invalid Codex CLI argument layout: --ask-for-approval must precede exec');
+  process.exit(2);
+}
 let input='';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data',chunk=>{input+=chunk;});
