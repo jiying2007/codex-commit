@@ -21,24 +21,31 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Apply Codex CLI compatibility fix
+      - name: Apply 1.2.2 compatibility and UX closure
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
 
+          # Runtime: only --ask-for-approval must be before the `exec` subcommand.
+          # Current Codex exec accepts sandbox/model/config after `exec`; keep those
+          # in their established positions to minimize compatibility surface.
           p = Path('extension.js')
           s = p.read_text()
-
           marker = "async function runCodex(diff, options, preferredScope, previousMessage, token) {\n"
           helper = r'''function buildCodexArgs(schemaPath, model) {
-  // Codex CLI separates top-level policy/configuration flags from `exec`
-  // subcommand flags. Keep safety controls before `exec`; keeping them after
-  // `exec` breaks on current CLIs (for example --ask-for-approval).
   const args = [
-    '--sandbox', 'read-only',
+    // Approval policy is a top-level Codex CLI option and must precede `exec`.
     '--ask-for-approval', 'never',
+    'exec',
+    '--json',
+    '--ephemeral',
+    '--skip-git-repo-check',
+    '--ignore-user-config',
+    '--ignore-rules',
+    '--sandbox', 'read-only',
+    '--output-schema', schemaPath,
 
     // Minimal capability set for a text-in / structured-text-out task.
     '--config', 'web_search="disabled"',
@@ -55,17 +62,7 @@ jobs:
   ];
 
   if (model) args.push('--model', model);
-
-  args.push(
-    'exec',
-    '--json',
-    '--ephemeral',
-    '--skip-git-repo-check',
-    '--ignore-user-config',
-    '--ignore-rules',
-    '--output-schema', schemaPath,
-    '-'
-  );
+  args.push('-');
   return args;
 }
 
@@ -104,52 +101,83 @@ jobs:
     args.push('-');
 '''
           new = "    const args = buildCodexArgs(schemaPath, options.model);\n"
-          if old not in s:
-              raise SystemExit('old Codex args block not found')
-          s = s.replace(old, new, 1)
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit('Codex args block not found')
 
           export_marker = '    buildPrompt,\n'
           if '    buildCodexArgs,\n' not in s:
               if export_marker not in s:
                   raise SystemExit('__test export marker not found')
               s = s.replace(export_marker, export_marker + '    buildCodexArgs,\n', 1)
-
           p.write_text(s)
 
+          # Unit regression: approval must be root-level, established exec flags stay after exec.
           t = Path('test.js')
           s = t.read_text()
           test_marker = "  // Scope inference.\n"
-          insert = r'''  // Codex CLI policy/config flags must be top-level, before `exec`.
+          insert = r'''  // Current Codex CLI requires approval policy before `exec`.
   const cliArgs = __test.buildCodexArgs('/tmp/schema.json', 'gpt-test');
   const execIndex = cliArgs.indexOf('exec');
-  assert.ok(execIndex > 0);
-  for (const flag of ['--sandbox', '--ask-for-approval', '--config', '--model']) {
+  const approvalIndex = cliArgs.indexOf('--ask-for-approval');
+  assert.ok(approvalIndex >= 0 && approvalIndex < execIndex, '--ask-for-approval must be before exec');
+  for (const flag of ['--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--sandbox', '--output-schema', '--config', '--model']) {
     const i = cliArgs.indexOf(flag);
-    assert.ok(i >= 0 && i < execIndex, `${flag} must be before exec`);
-  }
-  for (const flag of ['--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--output-schema']) {
-    const i = cliArgs.indexOf(flag);
-    assert.ok(i > execIndex, `${flag} must be after exec`);
+    assert.ok(i > execIndex, `${flag} must remain an exec-side argument`);
   }
   assert.strictEqual(cliArgs.at(-1), '-');
 
 '''
-          if 'Codex CLI policy/config flags must be top-level' not in s:
+          if 'Current Codex CLI requires approval policy before `exec`.' not in s:
               if test_marker not in s:
-                  raise SystemExit('test insertion marker not found')
+                  raise SystemExit('unit test insertion marker not found')
               s = s.replace(test_marker, insert + test_marker, 1)
           t.write_text(s)
 
+          # Extension Host fake Codex rejects the old broken layout on every platform.
+          it = Path('test/integration/runTest.js')
+          s = it.read_text()
+          old_line = "if(args.includes('--version')){console.log('codex-cli fake');process.exit(0);}\n"
+          check = r'''if(args.includes('--version')){console.log('codex-cli fake');process.exit(0);}
+const execIndex=args.indexOf('exec');
+const approvalIndex=args.indexOf('--ask-for-approval');
+if(execIndex<0||approvalIndex<0||approvalIndex>execIndex){
+ console.error('invalid Codex CLI argument layout: --ask-for-approval must precede exec');
+ process.exit(2);
+}
+'''
+          if 'invalid Codex CLI argument layout' not in s:
+              if old_line not in s:
+                  raise SystemExit('integration fake Codex marker not found')
+              s = s.replace(old_line, check, 1)
+          it.write_text(s)
+
+          # UX: avoid collision with built-in Git refresh icon.
+          pkg = Path('package.json')
+          ps = pkg.read_text()
+          if '"icon": "$(redo)"' not in ps:
+              if '"icon": "$(refresh)"' not in ps:
+                  raise SystemExit('regenerate refresh icon not found')
+              ps = ps.replace('"icon": "$(refresh)"', '"icon": "$(redo)"', 1)
+          pkg.write_text(ps)
+
+          # Release notes + install docs.
           c = Path('CHANGELOG.md')
-          s = c.read_text()
-          if '## 1.2.2' not in s:
-              s = s.replace('# Changelog\n', '''# Changelog\n\n## 1.2.2\n\n- Fix Codex CLI compatibility by placing top-level sandbox, approval, model, and config flags before the `exec` subcommand.\n- Add a regression test that enforces the top-level vs `exec` argument boundary.\n''', 1)
-          c.write_text(s)
+          cs = c.read_text()
+          if '## 1.2.2' not in cs:
+              cs = cs.replace('# Changelog\n', '''# Changelog\n\n## 1.2.2\n\n- Fix compatibility with current Codex CLI by placing `--ask-for-approval never` before the `exec` subcommand while preserving the existing read-only/minimal-capability safety boundary.\n- Add unit and cross-platform Extension Host regression checks for the Codex CLI argument boundary.\n- Change the Regenerate Source Control action icon from `refresh` to `redo` to avoid visual collision with Git Refresh.\n''', 1)
+          c.write_text(cs)
 
           for name in ['README.md', 'README.zh-CN.md']:
               rp = Path(name)
               rs = rp.read_text().replace('codex-commit-safe-1.2.1.vsix', 'codex-commit-safe-1.2.2.vsix')
               rp.write_text(rs)
+
+          mp = Path('.github/workflows/marketplace.yml')
+          if mp.exists():
+              ms = mp.read_text().replace("default: 'v1.2.1'", "default: 'v1.2.2'", 1)
+              mp.write_text(ms)
           PY
 
           npm version 1.2.2 --no-git-tag-version --ignore-scripts
@@ -159,12 +187,14 @@ jobs:
           npm run check
           npm run package
 
-      - name: Commit fix branch
+      - name: Commit final 1.2.2 source
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add extension.js test.js CHANGELOG.md README.md README.zh-CN.md package.json package-lock.json
-          git commit -m "fix: support current Codex CLI argument layout"
+          rm -f .ci-trigger-codex-args-1.2.2 .ci-trigger-codex-args-1.2.2-2
+          git add extension.js test.js test/integration/runTest.js package.json package-lock.json CHANGELOG.md README.md README.zh-CN.md .github/workflows/marketplace.yml
+          git add -u
+          git commit -m "fix: support current Codex CLI and refine regenerate action"
           git push origin HEAD:fix-codex-cli-args-1.2.2
