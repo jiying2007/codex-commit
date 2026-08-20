@@ -115,7 +115,7 @@ codex --version
 从 GitHub Release 下载 VSIX：
 
 ```bash
-code --install-extension codex-commit-safe-1.2.1.vsix
+code --install-extension codex-commit-safe-1.2.2.vsix
 ```
 
 或者在 VS Code 中：
