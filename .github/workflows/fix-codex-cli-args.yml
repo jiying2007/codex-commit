@@ -1,15 +1,16 @@
 name: Fix Codex CLI argument layout
 
 on:
-  pull_request:
+  push:
     branches: [main]
+    paths:
+      - '.github/workflows/fix-codex-cli-args.yml'
 
 permissions:
   contents: write
 
 jobs:
   fix:
-    if: github.head_ref == 'fix-codex-cli-args-1.2.2'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,9 +29,6 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          # Runtime: only --ask-for-approval must be before the `exec` subcommand.
-          # Current Codex exec accepts sandbox/model/config after `exec`; keep those
-          # in their established positions to minimize compatibility surface.
           p = Path('extension.js')
           s = p.read_text()
           marker = "async function runCodex(diff, options, preferredScope, previousMessage, token) {\n"
@@ -113,7 +111,6 @@ jobs:
               s = s.replace(export_marker, export_marker + '    buildCodexArgs,\n', 1)
           p.write_text(s)
 
-          # Unit regression: approval must be root-level, established exec flags stay after exec.
           t = Path('test.js')
           s = t.read_text()
           test_marker = "  // Scope inference.\n"
@@ -135,7 +132,6 @@ jobs:
               s = s.replace(test_marker, insert + test_marker, 1)
           t.write_text(s)
 
-          # Extension Host fake Codex rejects the old broken layout on every platform.
           it = Path('test/integration/runTest.js')
           s = it.read_text()
           old_line = "if(args.includes('--version')){console.log('codex-cli fake');process.exit(0);}\n"
@@ -153,7 +149,6 @@ if(execIndex<0||approvalIndex<0||approvalIndex>execIndex){
               s = s.replace(old_line, check, 1)
           it.write_text(s)
 
-          # UX: avoid collision with built-in Git refresh icon.
           pkg = Path('package.json')
           ps = pkg.read_text()
           if '"icon": "$(redo)"' not in ps:
@@ -162,7 +157,6 @@ if(execIndex<0||approvalIndex<0||approvalIndex>execIndex){
               ps = ps.replace('"icon": "$(refresh)"', '"icon": "$(redo)"', 1)
           pkg.write_text(ps)
 
-          # Release notes + install docs.
           c = Path('CHANGELOG.md')
           cs = c.read_text()
           if '## 1.2.2' not in cs:
