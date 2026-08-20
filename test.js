@@ -74,9 +74,40 @@ function spawnGit(args, cwd) {
   }
   assert.strictEqual(cliArgs.at(-1), '-');
 
-  // Scope inference.
+  // Scope inference: exact paths are strong, changed behavior is semantic evidence,
+  // and generic filenames must not silently bias a domain scope.
   assert.strictEqual(__test.inferScope(['modules/wifi/wowl.c'], ['wifi', 'motor']), 'wifi');
   assert.strictEqual(__test.inferScope(['wifi/a.c', 'motor/b.c'], ['wifi', 'motor']), '');
+  assert.strictEqual(__test.inferScope(['main/sensor_entry.cpp'], ['camera', 'system']), '');
+
+  const lowPowerDiff = `diff --git a/main/sensor_entry.cpp b/main/sensor_entry.cpp
+--- a/main/sensor_entry.cpp
++++ b/main/sensor_entry.cpp
+@@ -146,6 +147,8 @@
++class SocLowPowerOutcomeGuard {};
++publishSocWakeupInfo(mode, wakeup_source, resume_success);
++const bool transition_resume_success = mcu_disarmed && rtc_cleared;
++VSHDIOS_CommitSuspend(suspend_wakeup_count);
+`;
+  assert.strictEqual(
+    __test.inferScope(['main/sensor_entry.cpp'], ['power', 'camera', 'system'], lowPowerDiff),
+    'power'
+  );
+  assert.strictEqual(
+    __test.inferScope(['main/sensor_entry.cpp'], ['camera', 'system'], lowPowerDiff),
+    ''
+  );
+
+  const cameraDiff = `diff --git a/camera/isp_pipeline.cpp b/camera/isp_pipeline.cpp
+--- a/camera/isp_pipeline.cpp
++++ b/camera/isp_pipeline.cpp
+@@ -1 +1 @@
++configureCameraIspVideoPipeline();
+`;
+  assert.strictEqual(
+    __test.inferScope(['camera/isp_pipeline.cpp'], ['camera', 'power'], cameraDiff),
+    'camera'
+  );
 
   // Scope validation.
   assert.deepStrictEqual(__test.validateScopes(['wifi', 'wifi', 'motor'], []), ['wifi', 'motor']);

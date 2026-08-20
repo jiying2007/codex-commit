@@ -115,7 +115,7 @@ codex --version
 从 GitHub Release 下载 VSIX：
 
 ```bash
-code --install-extension codex-commit-safe-1.2.2.vsix
+code --install-extension codex-commit-safe-1.2.4.vsix
 ```
 
 或者在 VS Code 中：
@@ -170,7 +170,7 @@ Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
 }
 ```
 
-项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 和 `safeCodexCommit.model` 只能通过应用级 User Settings 配置。
+项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 和 `safeCodexCommit.model` 只能通过应用级 User Settings 配置。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
 
 ## 扩展身份
 
