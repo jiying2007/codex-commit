@@ -41,9 +41,6 @@ const DEFAULT_SCOPE_HINTS = {
 let outputChannel;
 let extensionMode = vscode.ExtensionMode?.Production ?? 1;
 
-// Per-repository generation state. Starting a new generation cancels the
-// previous one; a monotonically increasing id also prevents stale results
-// from writing even if process cancellation races with completion.
 const activeGenerations = new Map();
 let nextGenerationId = 1;
 
@@ -123,14 +120,7 @@ function isWindowsScript(command) {
 }
 
 function quoteWindowsCmdArg(value) {
-  const s = String(value);
-  const escaped = s
-    .replace(/\^/g, '^^')
-    .replace(/%/g, '%%')
-    .replace(/!/g, '^^!')
-    .replace(/"/g, '""')
-    .replace(/([&|<>])/g, '^$1');
-  return `"${escaped}"`;
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
 
 function prepareCommand(command, args) {
