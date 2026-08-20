@@ -1,0 +1,66 @@
+name: Finalize 1.2.2
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.head_ref == 'finalize-1.2.2'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Synchronize and verify package-lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = '1.2.2'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          test "$(node -p "require('./package-lock.json').version")" = '1.2.2'
+          test "$(node -p "require('./package-lock.json').packages[''].version")" = '1.2.2'
+          npm run verify:lock
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+
+      - name: Commit final metadata and remove temporary workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/fix-codex-cli-args.yml
+          rm -f .github/workflows/finalize-1.2.2.yml
+          git add package-lock.json
+          git add -u .github/workflows/fix-codex-cli-args.yml .github/workflows/finalize-1.2.2.yml
+          git commit -m "chore: finalize 1.2.2 release metadata"
+          git push origin HEAD:main
+
+      - name: Remove temporary branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in \
+            fix-codex-cli-args-1.2.2 \
+            validate-1.2.2 \
+            bootstrap-1.2.2 \
+            fix-codex-cli-args-1.2.2-sync \
+            fix-codex-cli-args-1.2.2-temp \
+            fix-codex-cli-args-1.2.2-trigger \
+            fix-codex-cli-args-1.2.2-stage \
+            fix-codex-cli-args-1.2.2-finalstage \
+            finalize-1.2.2; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" >/dev/null 2>&1 || true
+          done
