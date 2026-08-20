@@ -16,5 +16,9 @@
   "config.scopes": "推荐使用的 Conventional Commit scope。",
   "config.autoInferScope": "结合 staged 路径与 changed code 语义推断推荐 scope；通用路径、弱证据或冲突信号不会强制指定 scope。",
   "config.extraInstructions": "附加到生成提示词的团队规则。工作区/项目值均按不可信提示数据处理。",
-  "config.timeoutSeconds": "等待 Codex CLI 的最长时间。"
+  "config.timeoutSeconds": "等待 Codex CLI 的最长时间。",
+  "config.scopeHints": "可选的 scope → 语义别名映射，仅用于本地 scope 推断。提示词是静态文本，永远不会被执行。",
+  "config.scopePolicy": "控制生成的非空 scope 是否允许超出已配置 scopes。",
+  "config.scopePolicy.flexible": "灵活：优先使用已配置 scopes，但 Codex 可返回其他更准确的 scope。",
+  "config.scopePolicy.strict": "严格：scope 必须为空或属于已配置 scopes。"
 }
