@@ -1,0 +1,103 @@
+name: VS Code Marketplace
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to publish, for example v1.2.1'
+        required: true
+        default: 'v1.2.1'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/marketplace.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: vscode-marketplace-${{ github.event.release.tag_name || inputs.tag || 'v1.2.1' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    env:
+      BOOTSTRAP_TAG: v1.2.1
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - name: Resolve immutable release tag
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            tag='${{ github.event.release.tag_name }}'
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag='${{ inputs.tag }}'
+          else
+            tag="$BOOTSTRAP_TAG"
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "tag must be vMAJOR.MINOR.PATCH: $tag" >&2
+            exit 1
+          }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Verify release source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "${{ steps.release.outputs.version }}"
+          test "$(node -p "require('./package.json').publisher")" = "jiying2007"
+          test "$(node -p "require('./package.json').name")" = "codex-commit-safe"
+          npm run verify:lock
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+
+      - name: Build and verify Marketplace VSIX
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run package
+          vsix="codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
+          test -f "$vsix"
+          unzip -Z1 "$vsix" > /tmp/vsix-files.txt
+          grep -Fx 'extension/package.nls.json' /tmp/vsix-files.txt
+          grep -Fx 'extension/package.nls.zh-cn.json' /tmp/vsix-files.txt
+          grep -Fx 'extension/README.zh-CN.md' /tmp/vsix-files.txt
+          if grep -E '^extension/(test|scripts|package-lock\.json|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
+            echo 'VSIX contains development-only files' >&2
+            exit 1
+          fi
+          sha256sum "$vsix"
+
+      - name: Publish Marketplace extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          vsix="codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
+          if [[ -n "${VSCE_PAT:-}" ]]; then
+            echo 'Publishing with VSCE_PAT using stable @vscode/vsce 3.9.2.'
+            ./node_modules/.bin/vsce publish --packagePath "$vsix" --pat "$VSCE_PAT" --skip-duplicate
+          else
+            echo 'VSCE_PAT is not configured; attempting GitHub OIDC Trusted Publishing.'
+            echo 'Marketplace policy must match: jiying2007/codex-commit + workflow marketplace.yml.'
+            npx --yes @vscode/vsce@3.9.3-5 publish --packagePath "$vsix" --oidc --skip-duplicate
+          fi
