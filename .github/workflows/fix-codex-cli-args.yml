@@ -1,0 +1,170 @@
+name: Fix Codex CLI argument layout
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.head_ref == 'fix-codex-cli-args-1.2.2'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix-codex-cli-args-1.2.2
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply Codex CLI compatibility fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('extension.js')
+          s = p.read_text()
+
+          marker = "async function runCodex(diff, options, preferredScope, previousMessage, token) {\n"
+          helper = r'''function buildCodexArgs(schemaPath, model) {
+  // Codex CLI separates top-level policy/configuration flags from `exec`
+  // subcommand flags. Keep safety controls before `exec`; keeping them after
+  // `exec` breaks on current CLIs (for example --ask-for-approval).
+  const args = [
+    '--sandbox', 'read-only',
+    '--ask-for-approval', 'never',
+
+    // Minimal capability set for a text-in / structured-text-out task.
+    '--config', 'web_search="disabled"',
+    '--config', 'features.shell_tool=false',
+    '--config', 'features.unified_exec=false',
+    '--config', 'features.shell_snapshot=false',
+    '--config', 'features.apps=false',
+    '--config', 'features.multi_agent=false',
+    '--config', 'features.remote_plugin=false',
+    '--config', 'features.hooks=false',
+    '--config', 'features.goals=false',
+    '--config', 'features.memories=false',
+    '--config', 'features.skill_mcp_dependency_install=false'
+  ];
+
+  if (model) args.push('--model', model);
+
+  args.push(
+    'exec',
+    '--json',
+    '--ephemeral',
+    '--skip-git-repo-check',
+    '--ignore-user-config',
+    '--ignore-rules',
+    '--output-schema', schemaPath,
+    '-'
+  );
+  return args;
+}
+
+'''
+          if 'function buildCodexArgs(' not in s:
+              if marker not in s:
+                  raise SystemExit('runCodex marker not found')
+              s = s.replace(marker, helper + marker, 1)
+
+          old = r'''    const args = [
+      'exec',
+      '--json',
+      '--ephemeral',
+      '--skip-git-repo-check',
+      '--ignore-user-config',
+      '--ignore-rules',
+      '--sandbox', 'read-only',
+      '--ask-for-approval', 'never',
+      '--output-schema', schemaPath,
+
+      // Minimal capability set for a text-in / structured-text-out task.
+      '--config', 'web_search="disabled"',
+      '--config', 'features.shell_tool=false',
+      '--config', 'features.unified_exec=false',
+      '--config', 'features.shell_snapshot=false',
+      '--config', 'features.apps=false',
+      '--config', 'features.multi_agent=false',
+      '--config', 'features.remote_plugin=false',
+      '--config', 'features.hooks=false',
+      '--config', 'features.goals=false',
+      '--config', 'features.memories=false',
+      '--config', 'features.skill_mcp_dependency_install=false'
+    ];
+
+    if (options.model) args.push('--model', options.model);
+    args.push('-');
+'''
+          new = "    const args = buildCodexArgs(schemaPath, options.model);\n"
+          if old not in s:
+              raise SystemExit('old Codex args block not found')
+          s = s.replace(old, new, 1)
+
+          export_marker = '    buildPrompt,\n'
+          if '    buildCodexArgs,\n' not in s:
+              if export_marker not in s:
+                  raise SystemExit('__test export marker not found')
+              s = s.replace(export_marker, export_marker + '    buildCodexArgs,\n', 1)
+
+          p.write_text(s)
+
+          t = Path('test.js')
+          s = t.read_text()
+          test_marker = "  // Scope inference.\n"
+          insert = r'''  // Codex CLI policy/config flags must be top-level, before `exec`.
+  const cliArgs = __test.buildCodexArgs('/tmp/schema.json', 'gpt-test');
+  const execIndex = cliArgs.indexOf('exec');
+  assert.ok(execIndex > 0);
+  for (const flag of ['--sandbox', '--ask-for-approval', '--config', '--model']) {
+    const i = cliArgs.indexOf(flag);
+    assert.ok(i >= 0 && i < execIndex, `${flag} must be before exec`);
+  }
+  for (const flag of ['--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--output-schema']) {
+    const i = cliArgs.indexOf(flag);
+    assert.ok(i > execIndex, `${flag} must be after exec`);
+  }
+  assert.strictEqual(cliArgs.at(-1), '-');
+
+'''
+          if 'Codex CLI policy/config flags must be top-level' not in s:
+              if test_marker not in s:
+                  raise SystemExit('test insertion marker not found')
+              s = s.replace(test_marker, insert + test_marker, 1)
+          t.write_text(s)
+
+          c = Path('CHANGELOG.md')
+          s = c.read_text()
+          if '## 1.2.2' not in s:
+              s = s.replace('# Changelog\n', '''# Changelog\n\n## 1.2.2\n\n- Fix Codex CLI compatibility by placing top-level sandbox, approval, model, and config flags before the `exec` subcommand.\n- Add a regression test that enforces the top-level vs `exec` argument boundary.\n''', 1)
+          c.write_text(s)
+
+          for name in ['README.md', 'README.zh-CN.md']:
+              rp = Path(name)
+              rs = rp.read_text().replace('codex-commit-safe-1.2.1.vsix', 'codex-commit-safe-1.2.2.vsix')
+              rp.write_text(rs)
+          PY
+
+          npm version 1.2.2 --no-git-tag-version --ignore-scripts
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm run verify:lock
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+          npm run package
+
+      - name: Commit fix branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extension.js test.js CHANGELOG.md README.md README.zh-CN.md package.json package-lock.json
+          git commit -m "fix: support current Codex CLI argument layout"
+          git push origin HEAD:fix-codex-cli-args-1.2.2
