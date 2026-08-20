@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/cleanup-legacy-branches.yml
+          git rm .github/workflows/cleanup-legacy-branches.yml .cleanup-legacy-branches-trigger
           git commit -m 'build: remove one-time legacy branch cleanup'
           git push origin HEAD:main
           gh pr close "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" || true
