@@ -18,6 +18,8 @@ const PROJECT_RULE_KEYS = new Set([
   'maxDiffBytes',
   'maxBodyChars',
   'scopes',
+  'scopeHints',
+  'scopePolicy',
   'autoInferScope',
   'extraInstructions',
   'timeoutSeconds'
@@ -97,6 +99,85 @@ function validateScopes(value, fallback) {
     }
   }
   return result;
+}
+
+function validateScopeHints(value, scopes, name = 'scopeHints') {
+  if (value == null) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(ui(`${name} 必须是 object。`, `${name} must be an object.`));
+  }
+
+  const allowedScopes = new Set(scopes);
+  const keys = Object.keys(value);
+  if (keys.length > 64) {
+    throw new Error(ui(`${name} 最多包含 64 个 scope。`, `${name} cannot contain more than 64 scopes.`));
+  }
+
+  const result = {};
+  for (const scope of keys) {
+    if (!allowedScopes.has(scope)) {
+      throw new Error(ui(
+        `${name} 包含未在 scopes 中声明的 scope：${scope}。`,
+        `${name} contains a scope that is not declared in scopes: ${scope}.`
+      ));
+    }
+    const hints = value[scope];
+    if (!Array.isArray(hints) || hints.length > 32) {
+      throw new Error(ui(
+        `${name}.${scope} 必须是最多 32 项的字符串数组。`,
+        `${name}.${scope} must be an array with at most 32 strings.`
+      ));
+    }
+
+    const normalized = [];
+    const seen = new Set();
+    for (const raw of hints) {
+      if (typeof raw !== 'string') {
+        throw new Error(ui(`${name}.${scope} 中的每一项都必须是字符串。`, `Every ${name}.${scope} entry must be a string.`));
+      }
+      const hint = raw.trim();
+      if (!hint || hint.length > 64 || /[\r\n\0\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(hint)) {
+        throw new Error(ui(`${name}.${scope} 包含非法或过长的提示词。`, `${name}.${scope} contains an invalid or overlong hint.`));
+      }
+      if (!tokenizeScopeEvidence(hint).length) {
+        throw new Error(ui(`${name}.${scope} 包含无法用于推断的提示词。`, `${name}.${scope} contains a hint with no usable tokens.`));
+      }
+      const key = hint.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        normalized.push(hint);
+      }
+    }
+    result[scope] = normalized;
+  }
+  return result;
+}
+
+function mergeScopeHints(base, override) {
+  const result = {};
+  for (const source of [base || {}, override || {}]) {
+    for (const [scope, hints] of Object.entries(source)) {
+      const current = result[scope] || [];
+      const seen = new Set(current.map(item => item.toLowerCase()));
+      for (const hint of hints) {
+        const key = hint.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          current.push(hint);
+        }
+      }
+      result[scope] = current;
+    }
+  }
+  return result;
+}
+
+function validateScopePolicy(value) {
+  const policy = String(value ?? 'flexible').trim();
+  if (!['flexible', 'strict'].includes(policy)) {
+    throw new Error(ui(`scopePolicy 不支持：${policy}`, `Unsupported scopePolicy: ${policy}`));
+  }
+  return policy;
 }
 
 function validateExtraInstructions(value) {
@@ -591,75 +672,230 @@ function tokenizeScopeEvidence(text) {
     .filter(Boolean);
 }
 
-function changedDiffText(diff) {
-  return String(diff || '')
-    .split(/\r?\n/)
-    .filter(line => (
-      (line.startsWith('+') && !line.startsWith('+++')) ||
-      (line.startsWith('-') && !line.startsWith('---'))
-    ))
-    .map(line => line.slice(1))
-    .join('\n');
+function tokenGroupKey(tokens) {
+  return tokens.join('\u0000');
 }
 
-function inferScope(paths, scopes, diff = '') {
-  if (!paths.length || !scopes.length) return '';
+function tokenGroups(values, excluded = new Set()) {
+  const groups = [];
+  const seen = new Set(excluded);
+  for (const value of values || []) {
+    const tokens = [...new Set(tokenizeScopeEvidence(value))];
+    if (!tokens.length) continue;
+    const key = tokenGroupKey(tokens);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    groups.push(tokens);
+  }
+  return { groups, seen };
+}
 
-  const evidence = new Map(scopes.map(scope => [scope, { path: 0, semantic: 0 }]));
-  const semanticTokens = new Set(tokenizeScopeEvidence(changedDiffText(diff)));
+function scopeEvidenceGroups(scope, customScopeHints = {}) {
+  const scopeTokens = [...new Set(tokenizeScopeEvidence(scope))];
+  const scopeKey = tokenGroupKey(scopeTokens);
+  const custom = tokenGroups(customScopeHints[scope] || [], new Set([scopeKey]));
+  const builtIn = tokenGroups(DEFAULT_SCOPE_HINTS[scope.toLowerCase()] || [], custom.seen);
+  return { scopeTokens, customGroups: custom.groups, builtInGroups: builtIn.groups };
+}
 
-  for (const file of paths) {
-    const pathTokens = new Set(tokenizeScopeEvidence(file));
-    for (const scope of scopes) {
-      const key = scope.toLowerCase();
-      const score = evidence.get(scope);
-      const scopeTokens = tokenizeScopeEvidence(key);
+function tokensContainGroup(tokens, group) {
+  return group.length > 0 && group.every(token => tokens.has(token));
+}
 
-      if (scopeTokens.length && scopeTokens.every(token => pathTokens.has(token))) {
-        score.path += 10;
-      }
+function countLineEvidence(lines, groups, caps) {
+  let exactHits = 0;
+  let customHits = 0;
+  let builtInHits = 0;
+  for (const line of lines || []) {
+    const tokens = new Set(tokenizeScopeEvidence(line));
+    if (!tokens.size) continue;
+    if (exactHits < caps.exact && tokensContainGroup(tokens, groups.scopeTokens)) exactHits += 1;
+    if (customHits < caps.custom && groups.customGroups.some(group => tokensContainGroup(tokens, group))) customHits += 1;
+    if (builtInHits < caps.builtIn && groups.builtInGroups.some(group => tokensContainGroup(tokens, group))) builtInHits += 1;
+  }
+  return { exactHits, customHits, builtInHits };
+}
 
-      const pathHints = new Set();
-      for (const hint of DEFAULT_SCOPE_HINTS[key] || []) {
-        for (const token of tokenizeScopeEvidence(hint)) {
-          if (pathTokens.has(token)) pathHints.add(token);
-        }
-      }
-      score.path += Math.min(pathHints.size * 4, 8);
+function weightedLineScore(hits, weights) {
+  return (
+    hits.exactHits * weights.exact +
+    hits.customHits * weights.custom +
+    hits.builtInHits * weights.builtIn
+  );
+}
+
+function parseScopeDiffSections(diff, stagedPaths = []) {
+  const sections = [];
+  let current;
+
+  const startSection = () => ({
+    path: stagedPaths[sections.length] || '',
+    hunkContexts: [],
+    addedLines: [],
+    deletedLines: []
+  });
+
+  for (const line of String(diff || '').split(/\r?\n/)) {
+    if (line.startsWith('diff --git ')) {
+      if (current) sections.push(current);
+      current = startSection();
+      continue;
+    }
+    if (!current) {
+      if (!stagedPaths.length) continue;
+      current = startSection();
+    }
+    if (line.startsWith('@@')) {
+      const match = line.match(/^@@[^@]*@@\s*(.*)$/);
+      if (match?.[1]) current.hunkContexts.push(match[1]);
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+      current.addedLines.push(line.slice(1));
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      current.deletedLines.push(line.slice(1));
+    }
+  }
+  if (current) sections.push(current);
+
+  while (sections.length < stagedPaths.length) {
+    sections.push({
+      path: stagedPaths[sections.length],
+      hunkContexts: [],
+      addedLines: [],
+      deletedLines: []
+    });
+  }
+  return sections;
+}
+
+function scoreScopeForSection(section, scope, customScopeHints) {
+  const groups = scopeEvidenceGroups(scope, customScopeHints);
+  const pathTokens = new Set(tokenizeScopeEvidence(section.path));
+  const exactPath = tokensContainGroup(pathTokens, groups.scopeTokens) ? 12 : 0;
+  const customPathHits = groups.customGroups.filter(group => tokensContainGroup(pathTokens, group)).length;
+  const builtInPathHits = groups.builtInGroups.filter(group => tokensContainGroup(pathTokens, group)).length;
+  const pathScore = exactPath + Math.min(customPathHits, 2) * 8 + Math.min(builtInPathHits, 2) * 4;
+
+  const contextHits = countLineEvidence(section.hunkContexts, groups, { exact: 2, custom: 3, builtIn: 3 });
+  const addedHits = countLineEvidence(section.addedLines, groups, { exact: 3, custom: 4, builtIn: 4 });
+  const deletedHits = countLineEvidence(section.deletedLines, groups, { exact: 2, custom: 3, builtIn: 3 });
+
+  const contextScore = weightedLineScore(contextHits, { exact: 8, custom: 6, builtIn: 4 });
+  const addedScore = weightedLineScore(addedHits, { exact: 5, custom: 4, builtIn: 2 });
+  const deletedScore = weightedLineScore(deletedHits, { exact: 1.5, custom: 1.25, builtIn: 0.75 });
+
+  const strong = Boolean(
+    exactPath || customPathHits ||
+    contextHits.exactHits || contextHits.customHits || contextHits.builtInHits ||
+    addedHits.exactHits || addedHits.customHits || addedHits.builtInHits >= 2
+  );
+
+  return {
+    path: pathScore,
+    context: contextScore,
+    added: addedScore,
+    deleted: deletedScore,
+    total: pathScore + contextScore + addedScore + deletedScore,
+    strong
+  };
+}
+
+function emptyScopeDecision() {
+  return {
+    scope: '',
+    candidate: '',
+    confidence: 'none',
+    topScore: 0,
+    margin: 0,
+    dominance: 0,
+    filesConsidered: 0,
+    changedWeight: 0
+  };
+}
+
+function inferScopeDecision(paths, scopes, diff = '', customScopeHints = {}) {
+  if (!paths.length || !scopes.length) return emptyScopeDecision();
+
+  const sections = parseScopeDiffSections(diff, paths);
+  const aggregate = new Map(scopes.map(scope => [scope, {
+    path: 0,
+    context: 0,
+    added: 0,
+    deleted: 0,
+    total: 0,
+    strongEvidence: 0,
+    winnerWeight: 0
+  }]));
+
+  let totalWeight = 0;
+  for (const section of sections) {
+    const changedWeight = Math.max(1, section.addedLines.length + section.deletedLines.length * 0.5);
+    const contributionScale = 1 + Math.min(changedWeight, 20) / 20;
+    totalWeight += changedWeight;
+
+    const local = scopes.map(scope => ({
+      scope,
+      ...scoreScopeForSection(section, scope, customScopeHints)
+    })).sort((a, b) => b.total - a.total || a.scope.localeCompare(b.scope));
+
+    const localTop = local[0];
+    const localSecond = local[1];
+    const localWinner = localTop && localTop.total >= 4 && (!localSecond || localTop.total - localSecond.total >= 2)
+      ? localTop.scope
+      : '';
+
+    for (const item of local) {
+      const target = aggregate.get(item.scope);
+      target.path += item.path * contributionScale;
+      target.context += item.context * contributionScale;
+      target.added += item.added * contributionScale;
+      target.deleted += item.deleted * contributionScale;
+      target.total += item.total * contributionScale;
+      if (item.strong) target.strongEvidence += 1;
+      if (localWinner === item.scope) target.winnerWeight += changedWeight;
     }
   }
 
-  for (const scope of scopes) {
-    const key = scope.toLowerCase();
-    const score = evidence.get(scope);
-    const scopeTokens = tokenizeScopeEvidence(key);
-
-    if (scopeTokens.length && scopeTokens.every(token => semanticTokens.has(token))) {
-      score.semantic += 6;
-    }
-
-    const semanticHints = new Set();
-    for (const hint of DEFAULT_SCOPE_HINTS[key] || []) {
-      for (const token of tokenizeScopeEvidence(hint)) {
-        if (semanticTokens.has(token)) semanticHints.add(token);
-      }
-    }
-    score.semantic += Math.min(semanticHints.size * 2, 12);
-  }
-
-  const ranked = [...evidence.entries()]
-    .map(([scope, score]) => ({ scope, ...score, total: score.path + score.semantic }))
-    .sort((a, b) => b.total - a.total || b.semantic - a.semantic || b.path - a.path || a.scope.localeCompare(b.scope));
+  const ranked = [...aggregate.entries()]
+    .map(([scope, score]) => ({ scope, ...score }))
+    .sort((a, b) => b.total - a.total || b.added - a.added || b.context - a.context || b.path - a.path || a.scope.localeCompare(b.scope));
 
   const top = ranked[0];
   const second = ranked[1];
-  if (!top || top.total < 4) return '';
-  if (second && top.total - second.total < 2) return '';
+  if (!top || top.total <= 0) return { ...emptyScopeDecision(), filesConsidered: sections.length, changedWeight: totalWeight };
 
-  // A single weak alias is not enough. Exact path matches or semantic behavior
-  // evidence may produce a preference; otherwise leave scope classification to Codex.
-  if (top.semantic === 0 && top.path < 8) return '';
-  return top.scope;
+  const margin = top.total - (second?.total || 0);
+  const dominance = totalWeight > 0 ? top.winnerWeight / totalWeight : 0;
+  let confidence = 'low';
+  let preferred = '';
+
+  if (top.strongEvidence > 0 && top.total >= 18 && margin >= 6 && dominance >= 0.65) {
+    confidence = 'high';
+    preferred = top.scope;
+  } else if (top.strongEvidence > 0 && top.total >= 8 && margin >= 3 && dominance >= 0.55) {
+    confidence = 'medium';
+    preferred = top.scope;
+  }
+
+  return {
+    scope: preferred,
+    candidate: top.scope,
+    confidence,
+    topScore: Number(top.total.toFixed(2)),
+    margin: Number(margin.toFixed(2)),
+    dominance: Number(dominance.toFixed(3)),
+    filesConsidered: sections.length,
+    changedWeight: Number(totalWeight.toFixed(2))
+  };
+}
+
+function inferScope(paths, scopes, diff = '', customScopeHints = {}) {
+  return inferScopeDecision(paths, scopes, diff, customScopeHints).scope;
+}
+
+function summarizeScopeDecision(decision) {
+  const preferred = decision.scope || '<none>';
+  const candidate = decision.candidate || '<none>';
+  return `scope inference: preferred=${preferred}, candidate=${candidate}, confidence=${decision.confidence}, score=${decision.topScore}, margin=${decision.margin}, dominance=${decision.dominance}, files=${decision.filesConsidered}`;
 }
 
 function readProjectRules(repoRoot) {
@@ -717,6 +953,13 @@ function getEffectiveOptions(repoRoot) {
   }
 
   const scopes = validateScopes(project.scopes, config.get('scopes', []));
+  const userScopeHints = validateScopeHints(config.get('scopeHints', {}), scopes, 'safeCodexCommit.scopeHints');
+  const projectScopeHints = validateScopeHints(project.scopeHints, scopes, `${PROJECT_RULES_FILE}.scopeHints`);
+  const scopeHints = mergeScopeHints(userScopeHints, projectScopeHints);
+  const scopePolicy = validateScopePolicy(project.scopePolicy ?? config.get('scopePolicy', 'flexible'));
+  if (scopePolicy === 'strict' && scopes.length === 0) {
+    throw new Error(ui('scopePolicy=strict 时至少需要配置一个 scope。', 'scopePolicy=strict requires at least one configured scope.'));
+  }
   const extraInstructions = [
     validateExtraInstructions(config.get('extraInstructions', '')),
     validateExtraInstructions(project.extraInstructions)
@@ -734,6 +977,8 @@ function getEffectiveOptions(repoRoot) {
     subjectMaxLength: clampNumber(project.subjectMaxLength ?? config.get('subjectMaxLength', 72), 72, 30, 120, 'subjectMaxLength'),
     maxBodyChars: clampNumber(project.maxBodyChars ?? config.get('maxBodyChars', 2000), 2000, 200, 10000, 'maxBodyChars'),
     scopes,
+    scopeHints,
+    scopePolicy,
     autoInferScope: typeof project.autoInferScope === 'boolean' ? project.autoInferScope : Boolean(config.get('autoInferScope', true)),
     extraInstructions,
     timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds')
@@ -763,8 +1008,12 @@ function buildPrompt(options, preferredScope, previousMessage) {
     '8. Return only schema-defined fields, with no explanation or alternative answer.'
   ];
 
-  if (options.scopes.length) lines.push(`Preferred scopes: ${options.scopes.join(', ')}. Use another scope only when it is more accurate.`);
-  if (preferredScope) lines.push(`Local path + changed-diff heuristics suggest scope "${preferredScope}". Treat this only as a weak prior and ignore it whenever the changed behavior supports another scope.`);
+  if (options.scopePolicy === 'strict') {
+    lines.push(`Strict scope policy: scope must be empty or one of: ${options.scopes.join(', ')}. Do not invent another scope.`);
+  } else if (options.scopes.length) {
+    lines.push(`Preferred scopes: ${options.scopes.join(', ')}. Use another scope only when it is more accurate.`);
+  }
+  if (preferredScope) lines.push(`Local path + changed-diff intelligence suggests scope "${preferredScope}" with sufficient confidence. Treat this as a prior, not an instruction; ignore it whenever the full diff supports another scope unless strict scope policy applies.`);
   if (previousMessage) {
     lines.push(
       'This is a regeneration. Avoid repeating the previous wording verbatim when a clearer accurate wording is available.',
@@ -780,13 +1029,16 @@ function buildPrompt(options, preferredScope, previousMessage) {
   return lines.join('\n');
 }
 
-function outputSchema() {
+function outputSchema(options = {}) {
+  const scopeSchema = options.scopePolicy === 'strict'
+    ? { type: 'string', enum: ['', ...(options.scopes || [])] }
+    : { type: 'string', maxLength: 32 };
   return {
     type: 'object',
     additionalProperties: false,
     properties: {
       type: { type: 'string', enum: [...VALID_TYPES] },
-      scope: { type: 'string', maxLength: 32 },
+      scope: scopeSchema,
       description: { type: 'string', minLength: 1, maxLength: 180 },
       body: {
         type: 'array',
@@ -822,7 +1074,7 @@ function parseCodexJsonl(stdout) {
   return lastAgentMessage.trim();
 }
 
-function validateStructuredResult(value) {
+function validateStructuredResult(value, options = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(ui('Codex 最终输出不是 JSON object。', 'Codex final output is not a JSON object.'));
   }
@@ -835,6 +1087,12 @@ function validateStructuredResult(value) {
   if (typeof value.scope !== 'string') throw new Error(ui('scope 必须是字符串。', 'scope must be a string.'));
   if (value.scope && !/^[a-z0-9][a-z0-9._-]{0,31}$/.test(value.scope)) {
     throw new Error(ui(`Codex 返回了非法 scope：${value.scope}`, `Codex returned an invalid scope: ${value.scope}`));
+  }
+  if (options.scopePolicy === 'strict' && value.scope && !(options.scopes || []).includes(value.scope)) {
+    throw new Error(ui(
+      `Codex 返回的 scope 不符合 strict policy：${value.scope}`,
+      `Codex returned a scope outside the strict policy: ${value.scope}`
+    ));
   }
 
   if (typeof value.description !== 'string') throw new Error(ui('description 必须是字符串。', 'description must be a string.'));
@@ -1053,7 +1311,7 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
 
   return withTemporaryDirectory(async tempDir => {
     const schemaPath = path.join(tempDir, 'commit-schema.json');
-    fs.writeFileSync(schemaPath, JSON.stringify(outputSchema()), { encoding: 'utf8', mode: 0o600 });
+    fs.writeFileSync(schemaPath, JSON.stringify(outputSchema(options)), { encoding: 'utf8', mode: 0o600 });
     const args = buildCodexArgs(schemaPath, options.model);
 
     let processResult;
@@ -1086,7 +1344,7 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
     } catch {
       throw new Error(ui('Codex 最终 agent_message 不是符合 output schema 的 JSON。', 'The final Codex agent_message is not JSON matching the output schema.'));
     }
-    return validateStructuredResult(parsed);
+    return validateStructuredResult(parsed, options);
   });
 }
 
@@ -1240,7 +1498,11 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
             return undefined;
           }
 
-          const preferredScope = options.autoInferScope ? inferScope(stagedPaths, options.scopes, diff) : '';
+          const scopeDecision = options.autoInferScope
+            ? inferScopeDecision(stagedPaths, options.scopes, diff, options.scopeHints)
+            : emptyScopeDecision();
+          if (options.autoInferScope) log(summarizeScopeDecision(scopeDecision));
+          const preferredScope = scopeDecision.scope;
           const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 2000) : '';
 
           const structured = await runCodex(
@@ -1384,6 +1646,9 @@ module.exports = {
   __test: {
     clampNumber,
     validateScopes,
+    validateScopeHints,
+    mergeScopeHints,
+    validateScopePolicy,
     validateExtraInstructions,
     isChineseUi,
     ui,
@@ -1394,7 +1659,10 @@ module.exports = {
     runProcess,
     runProcessBuffer,
     runPreparedProcess,
+    parseScopeDiffSections,
+    inferScopeDecision,
     inferScope,
+    summarizeScopeDecision,
     readProjectRules,
     buildPrompt,
     buildCodexArgs,

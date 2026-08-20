@@ -1,0 +1,125 @@
+[
+  {
+    "name": "exact wifi module path",
+    "paths": [
+      "modules/wifi/wowl.c"
+    ],
+    "scopes": [
+      "wifi",
+      "motor"
+    ],
+    "diff": "diff --git a/modules/wifi/wowl.c b/modules/wifi/wowl.c\n@@ -1 +1 @@ wifi_wowl_update\n+enableWowl();",
+    "expected": "wifi"
+  },
+  {
+    "name": "generic sensor path without domain evidence",
+    "paths": [
+      "main/sensor_entry.cpp"
+    ],
+    "scopes": [
+      "camera",
+      "system"
+    ],
+    "diff": "diff --git a/main/sensor_entry.cpp b/main/sensor_entry.cpp\n@@ -1 +1 @@ SensorEntry::run\n+updateState();",
+    "expected": ""
+  },
+  {
+    "name": "soc low power semantic evidence",
+    "paths": [
+      "main/sensor_entry.cpp"
+    ],
+    "scopes": [
+      "power",
+      "camera",
+      "system"
+    ],
+    "diff": "diff --git a/main/sensor_entry.cpp b/main/sensor_entry.cpp\n@@ -1 +1 @@ SensorEntry::enterLowPower\n+SocLowPowerOutcomeGuard guard;\n+publishSocWakeupInfo(mode, wakeup_source, resume_success);\n+VSHDIOS_CommitSuspend(count);",
+    "expected": "power"
+  },
+  {
+    "name": "removed camera but added power behavior",
+    "paths": [
+      "main/transition.cpp"
+    ],
+    "scopes": [
+      "power",
+      "camera"
+    ],
+    "diff": "diff --git a/main/transition.cpp b/main/transition.cpp\n@@ -1,3 +1,5 @@ Transition::enterLowPower\n-configureCameraIsp();\n-stopVideoPipeline();\n+prepareSuspend();\n+publishWakeupInfo();\n+resumePowerState();\n+handleWakeupSource();",
+    "expected": "power"
+  },
+  {
+    "name": "hunk context supplies power semantics",
+    "paths": [
+      "main/entry.cpp"
+    ],
+    "scopes": [
+      "power",
+      "camera"
+    ],
+    "diff": "diff --git a/main/entry.cpp b/main/entry.cpp\n@@ -1 +1 @@ SensorEntry::enterLowPower\n+return finalizeTransition();",
+    "expected": "power"
+  },
+  {
+    "name": "dominant wifi file outweighs small camera edit",
+    "paths": [
+      "wifi/wowl.cpp",
+      "camera/isp.cpp"
+    ],
+    "scopes": [
+      "wifi",
+      "camera"
+    ],
+    "diff": "diff --git a/wifi/wowl.cpp b/wifi/wowl.cpp\n@@ -1 +1,8 @@ updateWifiWowl\n+configureWifiWake();\n+enableWlanWake();\n+updateWowlPattern();\n+syncWirelessState();\n+armWifiWake();\n+verifyWlanWake();\n+persistWowlState();\n+resumeWifi();\ndiff --git a/camera/isp.cpp b/camera/isp.cpp\n@@ -1 +1 @@ updateIsp\n+refreshCameraIsp();",
+    "expected": "wifi"
+  },
+  {
+    "name": "balanced multi subsystem edit stays ambiguous",
+    "paths": [
+      "wifi/wowl.cpp",
+      "motor/foc.cpp"
+    ],
+    "scopes": [
+      "wifi",
+      "motor"
+    ],
+    "diff": "diff --git a/wifi/wowl.cpp b/wifi/wowl.cpp\n@@ -1 +1,2 @@ updateWifi\n+enableWifiWake();\n+updateWowl();\ndiff --git a/motor/foc.cpp b/motor/foc.cpp\n@@ -1 +1,2 @@ updateMotor\n+updateMotorFoc();\n+setWheelTorque();",
+    "expected": ""
+  },
+  {
+    "name": "project custom navigation hints",
+    "paths": [
+      "main/control.cpp"
+    ],
+    "scopes": [
+      "navigation",
+      "system"
+    ],
+    "scopeHints": {
+      "navigation": [
+        "planner",
+        "obstacle avoidance",
+        "localization"
+      ]
+    },
+    "diff": "diff --git a/main/control.cpp b/main/control.cpp\n@@ -1 +1,3 @@ NavigationController::update\n+planner.update();\n+runObstacleAvoidance();\n+syncLocalization();",
+    "expected": "navigation"
+  },
+  {
+    "name": "weak single custom hint does not force scope",
+    "paths": [
+      "main/control.cpp"
+    ],
+    "scopes": [
+      "navigation",
+      "system"
+    ],
+    "scopeHints": {
+      "navigation": [
+        "planner"
+      ]
+    },
+    "diff": "diff --git a/main/control.cpp b/main/control.cpp\n@@ -1 +1 @@ update\n+planner.tick();",
+    "expected": ""
+  }
+]

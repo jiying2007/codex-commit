@@ -25,6 +25,8 @@ Organization-managed Codex requirements, managed hooks, MDM settings, or cloud p
 
 Project configuration cannot set the Codex executable, model, environment variables, working directory, or arbitrary commands. The executable path and model are application-scoped User Settings and are checked again at runtime.
 
+`scopeHints` are bounded static strings used only by local scope scoring and are never executed or forwarded as commands. `scopePolicy=strict` is enforced both in the Structured Output schema and by local result validation.
+
 ## Repository consistency
 
 The generated message must describe the exact staged state that was analyzed. The extension snapshots both:

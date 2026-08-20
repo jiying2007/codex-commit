@@ -115,7 +115,7 @@ codex --version
 从 GitHub Release 下载 VSIX：
 
 ```bash
-code --install-extension codex-commit-safe-1.2.4.vsix
+code --install-extension codex-commit-safe-1.3.0.vsix
 ```
 
 或者在 VS Code 中：
@@ -165,12 +165,19 @@ Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
     "system"
   ],
   "autoInferScope": true,
+  "scopeHints": {
+    "power": ["low power", "suspend", "resume", "wakeup"],
+    "camera": ["isp", "venc", "mipi"]
+  },
+  "scopePolicy": "flexible",
   "extraInstructions": "修复缺陷优先使用 fix；新增功能使用 feat；一次提交只表达一个逻辑目的。",
   "timeoutSeconds": 90
 }
 ```
 
 项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 和 `safeCodexCommit.model` 只能通过应用级 User Settings 配置。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
+
+Scope 推断会按文件综合 staged 路径、hunk/函数上下文、新增代码，以及较低权重的删除代码；低置信度或多子系统证据接近时会故意不提供 preferred scope，让 Codex 根据完整 diff 判断。`scopeHints` 可补充项目自己的静态语义别名，提示词不会被执行。`scopePolicy` 默认 `flexible`；只有需要强制非空 scope 必须属于已配置 `scopes` 时才设置为 `strict`。
 
 ## 扩展身份
 

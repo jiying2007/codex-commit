@@ -112,7 +112,7 @@ codex --version
 Download the VSIX from the GitHub Release and install it:
 
 ```bash
-code --install-extension codex-commit-safe-1.2.4.vsix
+code --install-extension codex-commit-safe-1.3.0.vsix
 ```
 
 Or in VS Code:
@@ -164,12 +164,19 @@ A repository may include `.codex-commit.json`:
     "system"
   ],
   "autoInferScope": true,
+  "scopeHints": {
+    "power": ["low power", "suspend", "resume", "wakeup"],
+    "camera": ["isp", "venc", "mipi"]
+  },
+  "scopePolicy": "flexible",
   "extraInstructions": "Prefer fix for bug fixes and feat for new functionality.",
   "timeoutSeconds": 90
 }
 ```
 
 Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` and `safeCodexCommit.model` are application-scoped User Settings. When `autoInferScope` is enabled, scope preference combines staged-path evidence with changed-diff semantics; generic filenames alone do not force a domain scope, and low-confidence/conflicting evidence is left to Codex.
+
+Scope inference combines staged paths, hunk/function context, added code, and lower-weight deleted code on a per-file basis. Low-confidence or balanced multi-subsystem changes deliberately leave the preferred scope empty so Codex can classify the full diff. `scopeHints` adds project-specific static semantic aliases without executing them. `scopePolicy` is `flexible` by default; set it to `strict` only when non-empty generated scopes must belong to the configured `scopes` list.
 
 ## Extension identity
 

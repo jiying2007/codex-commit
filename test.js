@@ -74,45 +74,50 @@ function spawnGit(args, cwd) {
   }
   assert.strictEqual(cliArgs.at(-1), '-');
 
-  // Scope inference: exact paths are strong, changed behavior is semantic evidence,
-  // and generic filenames must not silently bias a domain scope.
+  // Scope inference regression corpus: exact paths, per-file dominance, added/deleted
+  // weighting, hunk symbols, custom hints, and ambiguous changes.
+  const scopeCases = JSON.parse(fs.readFileSync(path.join(__dirname, 'test', 'scope-cases.json'), 'utf8'));
+  for (const testCase of scopeCases) {
+    assert.strictEqual(
+      __test.inferScope(testCase.paths, testCase.scopes, testCase.diff || '', testCase.scopeHints || {}),
+      testCase.expected,
+      `scope case failed: ${testCase.name}`
+    );
+  }
+
+  const explainedScope = __test.inferScopeDecision(
+    ['main/sensor_entry.cpp'],
+    ['power', 'camera', 'system'],
+    `diff --git a/main/sensor_entry.cpp b/main/sensor_entry.cpp
+@@ -1 +1 @@ SensorEntry::enterLowPower
++publishSocWakeupInfo(mode, wakeup_source, resume_success);
++VSHDIOS_CommitSuspend(count);`,
+    {}
+  );
+  assert.strictEqual(explainedScope.scope, 'power');
+  assert.ok(['medium', 'high'].includes(explainedScope.confidence));
+  assert.ok(explainedScope.dominance >= 0.55);
+  assert.match(__test.summarizeScopeDecision(explainedScope), /preferred=power/);
+  assert.doesNotMatch(__test.summarizeScopeDecision(explainedScope), /sensor_entry/);
+
+  // Compatibility cases retained from 1.2.4.
   assert.strictEqual(__test.inferScope(['modules/wifi/wowl.c'], ['wifi', 'motor']), 'wifi');
   assert.strictEqual(__test.inferScope(['wifi/a.c', 'motor/b.c'], ['wifi', 'motor']), '');
   assert.strictEqual(__test.inferScope(['main/sensor_entry.cpp'], ['camera', 'system']), '');
-
-  const lowPowerDiff = `diff --git a/main/sensor_entry.cpp b/main/sensor_entry.cpp
---- a/main/sensor_entry.cpp
-+++ b/main/sensor_entry.cpp
-@@ -146,6 +147,8 @@
-+class SocLowPowerOutcomeGuard {};
-+publishSocWakeupInfo(mode, wakeup_source, resume_success);
-+const bool transition_resume_success = mcu_disarmed && rtc_cleared;
-+VSHDIOS_CommitSuspend(suspend_wakeup_count);
-`;
-  assert.strictEqual(
-    __test.inferScope(['main/sensor_entry.cpp'], ['power', 'camera', 'system'], lowPowerDiff),
-    'power'
-  );
-  assert.strictEqual(
-    __test.inferScope(['main/sensor_entry.cpp'], ['camera', 'system'], lowPowerDiff),
-    ''
-  );
-
-  const cameraDiff = `diff --git a/camera/isp_pipeline.cpp b/camera/isp_pipeline.cpp
---- a/camera/isp_pipeline.cpp
-+++ b/camera/isp_pipeline.cpp
-@@ -1 +1 @@
-+configureCameraIspVideoPipeline();
-`;
-  assert.strictEqual(
-    __test.inferScope(['camera/isp_pipeline.cpp'], ['camera', 'power'], cameraDiff),
-    'camera'
-  );
 
   // Scope validation.
   assert.deepStrictEqual(__test.validateScopes(['wifi', 'wifi', 'motor'], []), ['wifi', 'motor']);
   assert.throws(() => __test.validateScopes(['BAD SCOPE'], []));
   assert.throws(() => __test.validateScopes(Array.from({ length: 65 }, (_, i) => `s${i}`), []));
+  assert.deepStrictEqual(
+    __test.validateScopeHints({ navigation: ['planner', 'obstacle avoidance'] }, ['navigation'], 'scopeHints'),
+    { navigation: ['planner', 'obstacle avoidance'] }
+  );
+  assert.throws(() => __test.validateScopeHints({ camera: ['isp'] }, ['power'], 'scopeHints'));
+  assert.throws(() => __test.validateScopeHints({ power: ['bad\nhint'] }, ['power'], 'scopeHints'));
+  assert.strictEqual(__test.validateScopePolicy('flexible'), 'flexible');
+  assert.strictEqual(__test.validateScopePolicy('strict'), 'strict');
+  assert.throws(() => __test.validateScopePolicy('legacy'));
 
   // User-only setting ignores workspace overrides.
   const fakeConfig = {
@@ -131,6 +136,10 @@ function spawnGit(args, cwd) {
   const schema = __test.outputSchema();
   assert.strictEqual(schema.additionalProperties, false);
   assert.deepStrictEqual(schema.required.sort(), ['body', 'description', 'scope', 'type']);
+  assert.deepStrictEqual(
+    __test.outputSchema({ scopePolicy: 'strict', scopes: ['power', 'camera'] }).properties.scope.enum,
+    ['', 'power', 'camera']
+  );
 
   // JSONL parsing.
   const jsonl = [
@@ -159,12 +168,30 @@ function spawnGit(args, cwd) {
     'feat(motor): 增加三相短接停机模式\n\n- 增加停机模式切换接口\n- 优化零速处理'
   );
   assert.throws(() => __test.validateStructuredResult({ type: 'bad', scope: '', description: 'x', body: [] }));
+  assert.deepStrictEqual(
+    __test.validateStructuredResult(
+      { type: 'fix', scope: 'power', description: '修复低功耗恢复', body: [] },
+      { scopePolicy: 'strict', scopes: ['power', 'camera'] }
+    ).scope,
+    'power'
+  );
+  assert.throws(() => __test.validateStructuredResult(
+    { type: 'fix', scope: 'other', description: '修复低功耗恢复', body: [] },
+    { scopePolicy: 'strict', scopes: ['power', 'camera'] }
+  ));
 
   // Project rules whitelist, malformed file and symlink protection.
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-test-'));
   try {
-    fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({ language: 'zh-CN', scopes: ['wifi'] }));
+    fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({
+      language: 'zh-CN',
+      scopes: ['wifi'],
+      scopeHints: { wifi: ['wowl'] },
+      scopePolicy: 'strict'
+    }));
     assert.deepStrictEqual(__test.readProjectRules(temp).scopes, ['wifi']);
+    assert.deepStrictEqual(__test.readProjectRules(temp).scopeHints, { wifi: ['wowl'] });
+    assert.strictEqual(__test.readProjectRules(temp).scopePolicy, 'strict');
 
     fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({ codexPath: '/tmp/evil' }));
     assert.throws(() => __test.readProjectRules(temp));
