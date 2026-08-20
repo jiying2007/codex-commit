@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Adapt the one-time migration to the already-hardened 1.2.4 README wording.
 p = Path('scripts/apply-scope-intelligence-v1.3.0.py')
 text = p.read_text(encoding='utf8')
 old_en = "anchor = 'Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` and `safeCodexCommit.model` are application-scoped User Settings.\\n'"
