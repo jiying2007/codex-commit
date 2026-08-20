@@ -29,8 +29,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 scripts/fix-scope-intelligence-migration.py
           python3 scripts/apply-scope-intelligence-v1.3.0.py
-          rm scripts/apply-scope-intelligence-v1.3.0.py
+          rm scripts/fix-scope-intelligence-migration.py scripts/apply-scope-intelligence-v1.3.0.py
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm run verify:lock
           npm ci --ignore-scripts --no-audit --no-fund
@@ -43,7 +44,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- extension.js package.json package-lock.json package.nls.json package.nls.zh-cn.json .codex-commit.example.json test.js test/scope-cases.json README.md README.zh-CN.md SECURITY.md CHANGELOG.md
-          git add -u -- scripts/apply-scope-intelligence-v1.3.0.py
+          git add -u -- scripts/fix-scope-intelligence-migration.py scripts/apply-scope-intelligence-v1.3.0.py
           git diff --cached --check
           git commit -m 'feat: add Scope Intelligence 1.3.0'
           git push origin HEAD:feat/scope-intelligence-v1.3.0
