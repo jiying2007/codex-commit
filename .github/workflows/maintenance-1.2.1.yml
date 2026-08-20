@@ -1,4 +1,4 @@
-name: Prepare 1.2.1 maintenance closure
+name: Retire duplicate 1.2.1 maintenance branch
 
 on:
   pull_request:
@@ -8,138 +8,14 @@ permissions:
   contents: write
 
 jobs:
-  prepare:
+  cleanup:
     if: github.head_ref == 'maintenance-1.2.1'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: maintenance-1.2.1
-          fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Apply runtime and test closure
+      - name: Delete duplicate maintenance branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          p = Path('extension.js')
-          s = p.read_text()
-          old = '''    } catch (error) {
-              lastError = error;
-              if (error.code !== 'ENOENT') {
-                // Continue trying where.exe alternatives on Windows; a broken .cmd shim
-                // should not prevent trying a later native executable.
-                if (process.platform === 'win32' && codexPath === 'codex') continue;
-                return { executable: candidate, version: '' };
-              }
-            }
-          '''
-          new = '''    } catch (error) {
-              lastError = error;
-              // For the default Windows command, keep trying where.exe/fallback
-              // candidates because one shim can be broken while another is usable.
-              if (process.platform === 'win32' && codexPath === 'codex') continue;
-              if (error.code === 'ENOENT') continue;
-
-              const unusable = new Error(
-                `Codex CLI 无法正常执行 --version：${candidate}。` +
-                '请检查安装、权限或 User Settings 中的 safeCodexCommit.codexPath。'
-              );
-              unusable.code = 'ECODEXUNUSABLE';
-              unusable.cause = error;
-              throw unusable;
-            }
-          '''
-          if old not in s:
-              raise SystemExit('resolveCodexExecutable target block not found')
-          s = s.replace(old, new, 1)
-          s = s.replace(
-              "'当前 Codex CLI 与 Codex Commit Safe 1.2.0 所需参数不兼容。' +",
-              "'当前 Codex CLI 与 Codex Commit Safe 所需参数不兼容。' +",
-              1
-          )
-          s = s.replace(
-              '    validateExtraInstructions,\n',
-              '    validateExtraInstructions,\n    buildPrompt,\n',
-              1
-          )
-          s = s.replace(
-              '    runPreparedProcess,\n',
-              '    runPreparedProcess,\n    resolveCodexExecutable,\n',
-              1
-          )
-          p.write_text(s)
-
-          t = Path('test.js')
-          s = t.read_text()
-          marker = "  // Output schema\n"
-          insert = r'''  // Chinese / English prompt support.
-          assert.match(
-            __test.buildPrompt({ language: 'zh-CN', subjectMaxLength: 72, scopes: [], extraInstructions: '' }, '', ''),
-            /简体中文/
-          );
-          assert.match(
-            __test.buildPrompt({ language: 'en', subjectMaxLength: 72, scopes: [], extraInstructions: '' }, '', ''),
-            /Use English for description and body\./
-          );
-
-          // An explicitly configured CLI that exists but cannot execute --version
-          // must fail closed instead of being accepted with an empty version.
-          const badCliDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-bad-cli-'));
-          try {
-            const badCli = path.join(badCliDir, process.platform === 'win32' ? 'bad-codex.cmd' : 'bad-codex');
-            if (process.platform === 'win32') {
-              fs.writeFileSync(badCli, '@echo off\r\nexit /b 7\r\n');
-            } else {
-              fs.writeFileSync(badCli, '#!/bin/sh\nexit 7\n');
-              fs.chmodSync(badCli, 0o755);
-            }
-            await assert.rejects(
-              __test.resolveCodexExecutable(badCli),
-              err => err.code === 'ECODEXUNUSABLE'
-            );
-          } finally {
-            fs.rmSync(badCliDir, { recursive: true, force: true });
-          }
-
-'''
-          if marker not in s:
-              raise SystemExit('test insertion marker not found')
-          s = s.replace(marker, insert + marker, 1)
-          s = s.replace(
-              "  console.log('All Codex Commit Safe 1.2.0 unit/regression tests passed.');",
-              "  console.log(`All Codex Commit Safe ${require('./package.json').version} unit/regression tests passed.`);",
-              1
-          )
-          t.write_text(s)
-
-          it = Path('test/integration/suite/integration.test.js')
-          s = it.read_text().replace(
-              "  console.log('Codex Commit Safe 1.2.0 Extension Host integration tests passed.');",
-              "  console.log('Codex Commit Safe Extension Host integration tests passed.');"
-          )
-          it.write_text(s)
-          PY
-
-          npm version 1.2.1 --no-git-tag-version --ignore-scripts
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          rm -f .gitlab-ci.yml
-          node --check extension.js
-          npm run verify:lock
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run check
-      - name: Commit prepared maintenance source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add extension.js test.js test/integration/suite/integration.test.js package.json package-lock.json
-          git add -u .gitlab-ci.yml
-          git commit -m "fix: close 1.2.1 runtime and compatibility gaps"
-          git push origin HEAD:maintenance-1.2.1
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/maintenance-1.2.1" >/dev/null 2>&1 || true
