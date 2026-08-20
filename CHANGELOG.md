@@ -7,6 +7,7 @@ Scope Intelligence release.
 - Replace global token-bag scope guessing with per-file evidence scoring across exact paths, hunk/function context, added code, and lower-weight deleted code.
 - Add dominance, margin, confidence, and strong-evidence gates so ambiguous or mixed-subsystem changes intentionally produce no local preferred scope.
 - Add bounded project/user `scopeHints` for custom domain aliases without executable rules or regexes.
+- Keep `scopeHints` local-only: repository hints extend User Settings deterministically for heuristic scoring and are not inserted into the Codex prompt.
 - Add optional `scopePolicy` (`flexible` / `strict`); strict mode is enforced in both Structured Output schema and local validation.
 - Add privacy-safe scope inference diagnostics that report only scores/confidence, never paths or diff content.
 - Add a table-driven scope regression corpus covering low power, camera, Wi-Fi, mixed changes, add/delete weighting, hunk symbols, and custom scopes.
