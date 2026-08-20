@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.3
+
+Maintenance / hardening release.
+
+- Strengthen `package-lock.json` release-gate verification for package identity, version, engines, development dependencies, and lockfile format.
+- Add Codex CLI capability probing through `--help` without invoking a model, while keeping unsupported arguments and safety configuration fail-closed.
+- Fail fast when a repository contains unresolved merge conflicts.
+- Harden Windows `.cmd` / `.bat` execution and cover paths containing spaces and shell-sensitive characters in Extension Host CI.
+- Add CI and release timeouts, release concurrency, rerun-safe GitHub Release publishing, and a standardized `release/vX.Y.Z` preparation flow.
+- Tighten Marketplace publishing secret scope and remove the hard-coded release tag and dynamic prerelease `vsce` bootstrap.
+- Narrow Simplified Chinese runtime locale matching and stabilize cross-platform TOCTOU integration timing.
+
 ## 1.2.2
 
 - Fix compatibility with current Codex CLI by placing `--ask-for-approval never` before the `exec` subcommand while preserving the existing read-only/minimal-capability safety boundary.

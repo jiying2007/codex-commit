@@ -16,6 +16,7 @@ jobs:
   unit:
     name: Unit / regression
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,6 +32,7 @@ jobs:
   integration-latest:
     name: Extension Host / ${{ matrix.os }} / latest
     needs: unit
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -68,6 +70,7 @@ jobs:
     name: Extension Host / Ubuntu / VS Code 1.90.0
     needs: unit
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       VSCODE_TEST_VERSION: '1.90.0'
     steps:
@@ -95,6 +98,7 @@ jobs:
     name: Official VSIX package
     needs: [integration-latest, integration-minimum]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

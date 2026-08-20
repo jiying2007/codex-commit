@@ -19,11 +19,12 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { __test } = require('./extension.js');
 const pkg = require('./package.json');
 
 function spawnGit(args, cwd) {
-  const r = require('child_process').spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   if (r.status !== 0) throw new Error(r.stderr || r.stdout);
   return r.stdout.trim();
 }
@@ -34,6 +35,12 @@ function spawnGit(args, cwd) {
   assert.strictEqual(__test.ui('中文', 'English'), 'English');
   fakeVscode.env.language = 'zh-cn';
   assert.strictEqual(__test.ui('中文', 'English'), '中文');
+  fakeVscode.env.language = 'zh-hans';
+  assert.strictEqual(__test.ui('中文', 'English'), '中文');
+  fakeVscode.env.language = 'zh-tw';
+  assert.strictEqual(__test.ui('中文', 'English'), 'English');
+  fakeVscode.env.language = 'zh-hk';
+  assert.strictEqual(__test.ui('中文', 'English'), 'English');
   fakeVscode.env.language = 'en';
 
   // Manifest NLS: all package.json placeholders must exist in both English and Chinese catalogs.
@@ -144,23 +151,43 @@ function spawnGit(args, cwd) {
     fs.rmSync(temp, { recursive: true, force: true });
   }
 
-  // CLI compatibility classification must not treat generic "invalid value" as version mismatch.
+  // CLI compatibility classification must fail closed for argument/config drift,
+  // but must not treat generic invalid values as a version mismatch.
   assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: unexpected argument --output-schema' }), true);
+  assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: unknown feature key features.apps' }), true);
+  assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: unknown config key web_search' }), true);
   assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: invalid value for model' }), false);
 
-  // Explicit Codex paths fail closed when --version fails instead of being accepted with an empty version.
+  // Explicit Codex paths fail closed when --version fails, and the environment
+  // capability probe verifies the required top-level and exec options without
+  // invoking a model or network request.
   if (process.platform !== 'win32') {
     const cliDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-cli-'));
     try {
       const good = path.join(cliDir, 'good-codex');
       const bad = path.join(cliDir, 'bad-codex');
-      fs.writeFileSync(good, '#!/bin/sh\necho "codex-cli 9.9.9"\n');
+      const missing = path.join(cliDir, 'missing-capability-codex');
+      fs.writeFileSync(good, `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "codex-cli 9.9.9"; exit 0; fi
+if [ "$1" = "--help" ]; then echo "--ask-for-approval"; exit 0; fi
+if [ "$1" = "exec" ] && [ "$2" = "--help" ]; then echo "--json --ephemeral --skip-git-repo-check --ignore-user-config --ignore-rules --sandbox --output-schema --config --model"; exit 0; fi
+exit 9
+`);
       fs.writeFileSync(bad, '#!/bin/sh\necho "broken" >&2\nexit 7\n');
+      fs.writeFileSync(missing, `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "codex-cli 9.9.9"; exit 0; fi
+if [ "$1" = "--help" ]; then echo "--ask-for-approval"; exit 0; fi
+if [ "$1" = "exec" ] && [ "$2" = "--help" ]; then echo "--json --ephemeral --sandbox"; exit 0; fi
+exit 9
+`);
       fs.chmodSync(good, 0o755);
       fs.chmodSync(bad, 0o755);
+      fs.chmodSync(missing, 0o755);
       const resolved = await __test.resolveCodexExecutable(good);
       assert.strictEqual(resolved.executable, good);
       assert.match(resolved.version, /9\.9\.9/);
+      assert.deepStrictEqual(await __test.probeCodexCapabilities(good, { requireModel: true }), { ok: true });
+      await assert.rejects(__test.probeCodexCapabilities(missing), err => err.code === 'ECODEXVERSION' && err.missingFlags.includes('--output-schema'));
       await assert.rejects(__test.resolveCodexExecutable(bad), err => err.code === 'ECODEXUNUSABLE');
     } finally {
       fs.rmSync(cliDir, { recursive: true, force: true });
@@ -225,6 +252,33 @@ function spawnGit(args, cwd) {
     assert.strictEqual(__test.repositorySnapshotsEqual(unborn, committed), false);
   } finally {
     fs.rmSync(snapshotRepo, { recursive: true, force: true });
+  }
+
+  // Unresolved merge conflicts are detected before Codex generation.
+  const conflictRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-conflict-'));
+  try {
+    spawnGit(['init'], conflictRepo);
+    spawnGit(['config', 'user.email', 'test@example.com'], conflictRepo);
+    spawnGit(['config', 'user.name', 'Codex Commit Test'], conflictRepo);
+    fs.writeFileSync(path.join(conflictRepo, 'conflict.txt'), 'base\n');
+    spawnGit(['add', 'conflict.txt'], conflictRepo);
+    spawnGit(['commit', '-m', 'base'], conflictRepo);
+    const baseBranch = spawnGit(['branch', '--show-current'], conflictRepo);
+    spawnGit(['checkout', '-b', 'other'], conflictRepo);
+    fs.writeFileSync(path.join(conflictRepo, 'conflict.txt'), 'other\n');
+    spawnGit(['add', 'conflict.txt'], conflictRepo);
+    spawnGit(['commit', '-m', 'other'], conflictRepo);
+    spawnGit(['checkout', baseBranch], conflictRepo);
+    fs.writeFileSync(path.join(conflictRepo, 'conflict.txt'), 'main\n');
+    spawnGit(['add', 'conflict.txt'], conflictRepo);
+    spawnGit(['commit', '-m', 'main'], conflictRepo);
+    const merge = spawnSync('git', ['merge', 'other'], { cwd: conflictRepo, encoding: 'utf8' });
+    assert.notStrictEqual(merge.status, 0);
+    assert.strictEqual(await __test.hasUnmergedEntries(conflictRepo), true);
+    spawnGit(['merge', '--abort'], conflictRepo);
+    assert.strictEqual(await __test.hasUnmergedEntries(conflictRepo), false);
+  } finally {
+    fs.rmSync(conflictRepo, { recursive: true, force: true });
   }
 
   // Process output limit protection.

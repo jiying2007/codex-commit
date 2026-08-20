@@ -41,14 +41,11 @@ const DEFAULT_SCOPE_HINTS = {
 let outputChannel;
 let extensionMode = vscode.ExtensionMode?.Production ?? 1;
 
-// Per-repository generation state. Starting a new generation cancels the
-// previous one; a monotonically increasing id also prevents stale results
-// from writing even if process cancellation races with completion.
 const activeGenerations = new Map();
 let nextGenerationId = 1;
 
 function isChineseUi() {
-  return /^zh(?:-|$)/i.test(String(vscode.env?.language || ''));
+  return /^(?:zh-cn|zh-hans)(?:-|$)/i.test(String(vscode.env?.language || ''));
 }
 
 function ui(zh, en) {
@@ -123,14 +120,7 @@ function isWindowsScript(command) {
 }
 
 function quoteWindowsCmdArg(value) {
-  const s = String(value);
-  const escaped = s
-    .replace(/\^/g, '^^')
-    .replace(/%/g, '%%')
-    .replace(/!/g, '^^!')
-    .replace(/"/g, '""')
-    .replace(/([&|<>])/g, '^$1');
-  return `"${escaped}"`;
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
 
 function prepareCommand(command, args) {
@@ -140,7 +130,7 @@ function prepareCommand(command, args) {
   const commandLine = '"' + [quoteWindowsCmdArg(command), ...args.map(quoteWindowsCmdArg)].join(' ') + '"';
   return {
     command: process.env.ComSpec || 'cmd.exe',
-    args: ['/d', '/s', '/c', commandLine],
+    args: ['/d', '/v:off', '/s', '/c', commandLine],
     shell: false,
     windowsVerbatimArguments: true
   };
@@ -538,6 +528,11 @@ async function getStagedPaths(repoRoot, token) {
   return stdout.split('\0').filter(s => s.length > 0);
 }
 
+async function hasUnmergedEntries(repoRoot, token) {
+  const { stdout } = await git(['ls-files', '-u', '-z'], repoRoot, token);
+  return stdout.length > 0;
+}
+
 async function getIndexFingerprint(repoRoot, token) {
   const { stdout } = await runProcessBuffer(
     'git',
@@ -884,6 +879,62 @@ async function resolveCodexExecutable(codexPath) {
   throw error;
 }
 
+const REQUIRED_CODEX_TOP_LEVEL_FLAGS = ['--ask-for-approval'];
+const REQUIRED_CODEX_EXEC_FLAGS = [
+  '--json',
+  '--ephemeral',
+  '--skip-git-repo-check',
+  '--ignore-user-config',
+  '--ignore-rules',
+  '--sandbox',
+  '--output-schema',
+  '--config'
+];
+
+function missingHelpFlags(helpText, requiredFlags) {
+  const text = String(helpText || '');
+  return requiredFlags.filter(flag => !text.includes(flag));
+}
+
+async function probeCodexCapabilities(executable, { requireModel = false } = {}) {
+  let topLevel;
+  let execHelp;
+  try {
+    [topLevel, execHelp] = await Promise.all([
+      runPreparedProcess(executable, ['--help'], { timeoutMs: 10000, maxStdoutBytes: 512 * 1024, maxStderrBytes: 256 * 1024 }),
+      runPreparedProcess(executable, ['exec', '--help'], { timeoutMs: 10000, maxStdoutBytes: 512 * 1024, maxStderrBytes: 256 * 1024 })
+    ]);
+  } catch (error) {
+    const wrapped = new Error(ui(
+      `Codex CLI capability probe 失败。请确认 "${executable} --help" 和 "${executable} exec --help" 可正常执行。原始错误：${error?.stderr || error?.message || error}`,
+      `Codex CLI capability probe failed. Make sure "${executable} --help" and "${executable} exec --help" run successfully. Original error: ${error?.stderr || error?.message || error}`
+    ));
+    wrapped.code = 'ECODEXVERSION';
+    wrapped.cause = error;
+    throw wrapped;
+  }
+
+  const topText = `${topLevel.stdout || ''}\n${topLevel.stderr || ''}`;
+  const execText = `${execHelp.stdout || ''}\n${execHelp.stderr || ''}`;
+  const missing = [
+    ...missingHelpFlags(topText, REQUIRED_CODEX_TOP_LEVEL_FLAGS),
+    ...missingHelpFlags(execText, requireModel ? [...REQUIRED_CODEX_EXEC_FLAGS, '--model'] : REQUIRED_CODEX_EXEC_FLAGS)
+  ];
+
+  if (missing.length) {
+    const unique = [...new Set(missing)];
+    const error = new Error(ui(
+      `当前 Codex CLI 缺少 Codex Commit Safe 必需能力：${unique.join(', ')}。请升级到兼容版本。`,
+      `The current Codex CLI is missing capabilities required by Codex Commit Safe: ${unique.join(', ')}. Upgrade to a compatible version.`
+    ));
+    error.code = 'ECODEXVERSION';
+    error.missingFlags = unique;
+    throw error;
+  }
+
+  return { ok: true };
+}
+
 async function withTemporaryDirectory(fn) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-'));
   try {
@@ -899,7 +950,10 @@ function isCliCompatibilityError(error) {
     text.includes('unexpected argument') ||
     text.includes('unknown argument') ||
     text.includes('unrecognized option') ||
-    text.includes('unknown option')
+    text.includes('unknown option') ||
+    text.includes('unknown feature') ||
+    text.includes('unknown config key') ||
+    text.includes('unrecognized config key')
   );
 }
 
@@ -961,8 +1015,8 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
       if (isCliCompatibilityError(error)) {
         const wrapped = new Error(
           ui(
-            '当前 Codex CLI 与 Codex Commit Safe 所需参数不兼容。请检查 Codex CLI 版本后重试。原始错误：',
-            'The current Codex CLI is incompatible with the arguments required by Codex Commit Safe. Check the Codex CLI version and try again. Original error: '
+            '当前 Codex CLI 与 Codex Commit Safe 所需参数或安全配置不兼容。请运行环境检查并升级 Codex CLI 后重试。原始错误：',
+            'The current Codex CLI is incompatible with the arguments or safety configuration required by Codex Commit Safe. Run the environment check and upgrade Codex CLI before trying again. Original error: '
           ) + (error.stderr || error.message)
         );
         wrapped.code = 'ECODEXVERSION';
@@ -1064,6 +1118,15 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
         const linked = linkCancellation(uiToken, state.cancelSource);
         const token = state.cancelSource.token;
         try {
+          if (await hasUnmergedEntries(repoRoot, token)) {
+            const error = new Error(ui(
+              '当前仓库存在未解决的 merge conflict。请先解决冲突并重新 Stage 后再生成 Commit Message。',
+              'The repository has unresolved merge conflicts. Resolve them and stage the result before generating a Commit Message.'
+            ));
+            error.code = 'EUNMERGED';
+            throw error;
+          }
+
           const snapshotBefore = await getRepositorySnapshot(repoRoot, token);
 
           if (
@@ -1187,10 +1250,12 @@ async function checkEnvironment() {
     throw new Error(ui('找不到 Git。请确认 git --version 可正常执行。', 'Git was not found. Make sure git --version runs successfully.'));
   }
 
-  log(`environment ok: codex=${resolved.version || 'detected'}, git=detected`);
+  await probeCodexCapabilities(resolved.executable, { requireModel: Boolean(options.model) });
+
+  log(`environment ok: codex=${resolved.version || 'detected'}, git=detected, cliCapabilities=ok`);
   vscode.window.showInformationMessage(ui(
-    `Codex Commit Safe 环境正常：${resolved.version || resolved.executable}；${gitVersion}`,
-    `Codex Commit Safe environment is ready: ${resolved.version || resolved.executable}; ${gitVersion}`
+    `Codex Commit Safe 环境正常：${resolved.version || resolved.executable}；${gitVersion}；必需 CLI 能力正常`,
+    `Codex Commit Safe environment is ready: ${resolved.version || resolved.executable}; ${gitVersion}; required CLI capabilities OK`
   ));
 }
 
@@ -1285,7 +1350,10 @@ module.exports = {
     formatCommitMessage,
     isCliCompatibilityError,
     resolveCodexExecutable,
+    missingHelpFlags,
+    probeCodexCapabilities,
     repositoryFromCommandContext,
+    hasUnmergedEntries,
     getIndexFingerprint,
     getHeadOid,
     getRepositorySnapshot,

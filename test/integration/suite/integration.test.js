@@ -82,11 +82,14 @@ async function run() {
   assert.strictEqual(r1.inputBox.value, 'fix(wifi): 修复集成测试问题');
 
   // Collection-window TOCTOU: index changes after first snapshot but before diff read.
+  // Windows runners can take noticeably longer to complete the first Git snapshot,
+  // so keep a wide collection window and mutate well inside it instead of relying on
+  // an 80 ms scheduler race.
   r1.inputBox.value = '';
-  process.env.CODEX_COMMIT_TEST_COLLECTION_DELAY_MS = '300';
+  process.env.CODEX_COMMIT_TEST_COLLECTION_DELAY_MS = '2000';
   fs.writeFileSync(delayFile, '20');
   const collecting = vscode.commands.executeCommand('safeCodexCommit.generate');
-  await wait(80);
+  await wait(1200);
   fs.appendFileSync(path.join(repo1, 'wifi.c'), 'int wifi_collection = 4;\n');
   exec('git', ['add', 'wifi.c'], repo1);
   await collecting;
