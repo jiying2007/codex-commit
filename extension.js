@@ -69,7 +69,6 @@ function assertTrustedWorkspace() {
   }
 }
 
-
 function clampNumber(value, fallback, min, max, name) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -282,8 +281,6 @@ function runProcess(command, args, options = {}, stdinText = '', cancellationTok
         if (process.platform === 'win32') {
           settle(reject, terminationError);
         }
-        // On POSIX, keep the process-group SIGKILL escalation timer alive
-        // even when the parent exits after SIGTERM.
         return;
       }
       if (code === 0) {
@@ -481,10 +478,7 @@ async function getRepositories() {
 
 function repositoryFromCommandContext(repositories, commandArgs) {
   for (const arg of commandArgs || []) {
-    const candidateUri =
-      arg?.rootUri ||
-      arg?.resourceUri ||
-      arg?.sourceControl?.rootUri;
+    const candidateUri = arg?.rootUri || arg?.resourceUri || arg?.sourceControl?.rootUri;
     const fsPath = candidateUri?.fsPath;
     if (!fsPath) continue;
     const normalized = normalizeFsPath(fsPath);
@@ -536,7 +530,6 @@ async function getStagedDiff(repoRoot, token) {
 }
 
 async function getStagedPaths(repoRoot, token) {
-  // -z is required for filenames containing newline/tab/quotes.
   const { stdout } = await git(
     ['diff', '--cached', '--name-only', '--diff-filter=ACMRDTUXB', '-z'],
     repoRoot,
@@ -546,8 +539,6 @@ async function getStagedPaths(repoRoot, token) {
 }
 
 async function getIndexFingerprint(repoRoot, token) {
-  // Hash the raw NUL-delimited index bytes. Never decode filenames as UTF-8:
-  // POSIX Git paths may contain arbitrary non-NUL bytes.
   const { stdout } = await runProcessBuffer(
     'git',
     ['ls-files', '--stage', '-z'],
@@ -575,8 +566,6 @@ async function getHeadOid(repoRoot, token) {
     }
     return oid;
   } catch (error) {
-    // `git rev-parse --verify --quiet HEAD` returns 1 without diagnostics for
-    // an unborn branch. The repository itself has already been validated.
     const stderr = Buffer.isBuffer(error?.stderr)
       ? error.stderr.toString('utf8')
       : String(error?.stderr || '');
@@ -595,20 +584,16 @@ async function getRepositorySnapshot(repoRoot, token) {
 
 function repositorySnapshotsEqual(a, b) {
   return Boolean(
-    a && b &&
-    a.headOid === b.headOid &&
-    a.indexFingerprint === b.indexFingerprint
+    a && b && a.headOid === b.headOid && a.indexFingerprint === b.indexFingerprint
   );
 }
 
 function inferScope(paths, scopes) {
   if (!paths.length || !scopes.length) return '';
-
   const scores = new Map(scopes.map(scope => [scope, 0]));
   for (const file of paths) {
     const lower = file.toLowerCase();
     const parts = lower.split(/[\\/._-]+/).filter(Boolean);
-
     for (const scope of scopes) {
       const s = scope.toLowerCase();
       if (parts.includes(s)) {
@@ -616,7 +601,6 @@ function inferScope(paths, scopes) {
       } else if (lower.includes(`/${s}/`) || lower.includes(`\\${s}\\`)) {
         scores.set(scope, scores.get(scope) + 4);
       }
-
       for (const hint of DEFAULT_SCOPE_HINTS[s] || []) {
         if (parts.includes(hint) || lower.includes(hint)) {
           scores.set(scope, scores.get(scope) + 1);
@@ -624,7 +608,6 @@ function inferScope(paths, scopes) {
       }
     }
   }
-
   const sorted = [...scores.entries()].sort((a, b) => b[1] - a[1]);
   if (!sorted.length || sorted[0][1] <= 0) return '';
   if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) return '';
@@ -659,12 +642,10 @@ function readProjectRules(repoRoot) {
 
   const unknown = Object.keys(parsed).filter(key => !PROJECT_RULE_KEYS.has(key));
   if (unknown.length) {
-    throw new Error(
-      ui(
-        `${PROJECT_RULES_FILE} 包含不支持的字段：${unknown.join(', ')}。项目规则不能配置可执行文件、模型、环境变量或工作目录。`,
-        `${PROJECT_RULES_FILE} contains unsupported fields: ${unknown.join(', ')}. Project rules cannot configure executables, models, environment variables, or working directories.`
-      )
-    );
+    throw new Error(ui(
+      `${PROJECT_RULES_FILE} 包含不支持的字段：${unknown.join(', ')}。项目规则不能配置可执行文件、模型、环境变量或工作目录。`,
+      `${PROJECT_RULES_FILE} contains unsupported fields: ${unknown.join(', ')}. Project rules cannot configure executables, models, environment variables, or working directories.`
+    ));
   }
   return parsed;
 }
@@ -672,9 +653,6 @@ function readProjectRules(repoRoot) {
 function getEffectiveOptions(repoRoot) {
   const config = vscode.workspace.getConfiguration('safeCodexCommit', vscode.Uri.file(repoRoot));
   const project = readProjectRules(repoRoot);
-
-  // codexPath/model are also application-scoped in package.json.
-  // This runtime check remains defense-in-depth.
   const codexPath = String(getUserOnlySetting(config, 'codexPath', 'codex') || 'codex').trim();
   const model = String(getUserOnlySetting(config, 'model', '') || '').trim();
 
@@ -704,27 +682,13 @@ function getEffectiveOptions(repoRoot) {
     codexPath,
     model,
     language,
-    maxDiffBytes: clampNumber(
-      project.maxDiffBytes ?? config.get('maxDiffBytes', 262144),
-      262144, 4096, 2097152, 'maxDiffBytes'
-    ),
-    subjectMaxLength: clampNumber(
-      project.subjectMaxLength ?? config.get('subjectMaxLength', 72),
-      72, 30, 120, 'subjectMaxLength'
-    ),
-    maxBodyChars: clampNumber(
-      project.maxBodyChars ?? config.get('maxBodyChars', 2000),
-      2000, 200, 10000, 'maxBodyChars'
-    ),
+    maxDiffBytes: clampNumber(project.maxDiffBytes ?? config.get('maxDiffBytes', 262144), 262144, 4096, 2097152, 'maxDiffBytes'),
+    subjectMaxLength: clampNumber(project.subjectMaxLength ?? config.get('subjectMaxLength', 72), 72, 30, 120, 'subjectMaxLength'),
+    maxBodyChars: clampNumber(project.maxBodyChars ?? config.get('maxBodyChars', 2000), 2000, 200, 10000, 'maxBodyChars'),
     scopes,
-    autoInferScope: typeof project.autoInferScope === 'boolean'
-      ? project.autoInferScope
-      : Boolean(config.get('autoInferScope', true)),
+    autoInferScope: typeof project.autoInferScope === 'boolean' ? project.autoInferScope : Boolean(config.get('autoInferScope', true)),
     extraInstructions,
-    timeoutSeconds: clampNumber(
-      project.timeoutSeconds ?? config.get('timeoutSeconds', 90),
-      90, 10, 300, 'timeoutSeconds'
-    )
+    timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds')
   };
 }
 
@@ -750,12 +714,8 @@ function buildPrompt(options, preferredScope, previousMessage) {
     '7. Return only schema-defined fields, with no explanation or alternative answer.'
   ];
 
-  if (options.scopes.length) {
-    lines.push(`Preferred scopes: ${options.scopes.join(', ')}. Use another scope only when it is more accurate.`);
-  }
-  if (preferredScope) {
-    lines.push(`The staged paths suggest scope "${preferredScope}". Use it only when the diff supports that conclusion.`);
-  }
+  if (options.scopes.length) lines.push(`Preferred scopes: ${options.scopes.join(', ')}. Use another scope only when it is more accurate.`);
+  if (preferredScope) lines.push(`The staged paths suggest scope "${preferredScope}". Use it only when the diff supports that conclusion.`);
   if (previousMessage) {
     lines.push(
       'This is a regeneration. Avoid repeating the previous wording verbatim when a clearer accurate wording is available.',
@@ -768,7 +728,6 @@ function buildPrompt(options, preferredScope, previousMessage) {
       options.extraInstructions
     );
   }
-
   return lines.join('\n');
 }
 
@@ -802,21 +761,11 @@ function parseCodexJsonl(stdout) {
     } catch {
       throw new Error(ui('Codex --json 返回了无法解析的 JSONL。', 'Codex --json returned invalid JSONL.'));
     }
-
-    if (
-      event?.type === 'item.completed' &&
-      event?.item?.type === 'agent_message' &&
-      typeof event.item.text === 'string'
-    ) {
+    if (event?.type === 'item.completed' && event?.item?.type === 'agent_message' && typeof event.item.text === 'string') {
       lastAgentMessage = event.item.text;
     }
-
-    if (event?.type === 'error') {
-      errors.push(event.message || event.error?.message || 'Codex reported an error');
-    }
-    if (event?.type === 'turn.failed') {
-      errors.push(event.error?.message || event.message || 'Codex turn failed');
-    }
+    if (event?.type === 'error') errors.push(event.message || event.error?.message || 'Codex reported an error');
+    if (event?.type === 'turn.failed') errors.push(event.error?.message || event.message || 'Codex turn failed');
   }
 
   if (!lastAgentMessage && errors.length) throw new Error(errors.join('; '));
@@ -828,13 +777,11 @@ function validateStructuredResult(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(ui('Codex 最终输出不是 JSON object。', 'Codex final output is not a JSON object.'));
   }
-
   const keys = Object.keys(value).sort();
   const expected = ['body', 'description', 'scope', 'type'];
   if (JSON.stringify(keys) !== JSON.stringify(expected)) {
     throw new Error(ui('Codex 最终输出字段不符合 schema。', 'Codex final output fields do not match the schema.'));
   }
-
   if (!VALID_TYPES.has(value.type)) throw new Error(ui(`Codex 返回了非法 type：${value.type}`, `Codex returned an invalid type: ${value.type}`));
   if (typeof value.scope !== 'string') throw new Error(ui('scope 必须是字符串。', 'scope must be a string.'));
   if (value.scope && !/^[a-z0-9][a-z0-9._-]{0,31}$/.test(value.scope)) {
@@ -865,11 +812,9 @@ function formatCommitMessage(result, options) {
   if (head.length > Math.max(options.subjectMaxLength + 40, 120)) {
     throw new Error(ui(`生成的 Commit 首行异常过长（${head.length} 字符）。`, `Generated commit subject is unexpectedly long (${head.length} characters).`));
   }
-
   const message = result.body.length
     ? `${head}\n\n${result.body.map(line => `- ${line}`).join('\n')}`
     : head;
-
   if (message.length > options.maxBodyChars) {
     throw new Error(ui(`Commit Message 过长（${message.length} 字符）。`, `Commit Message is too long (${message.length} characters).`));
   }
@@ -880,32 +825,21 @@ function formatCommitMessage(result, options) {
 }
 
 async function findWindowsCodexCandidates(codexPath) {
-  if (process.platform !== 'win32' || codexPath !== 'codex') {
-    return [codexPath];
-  }
-
+  if (process.platform !== 'win32' || codexPath !== 'codex') return [codexPath];
   const candidates = [];
   try {
-    const { stdout } = await runProcess(
-      'where.exe',
-      ['codex'],
-      { timeoutMs: 5000 }
-    );
+    const { stdout } = await runProcess('where.exe', ['codex'], { timeoutMs: 5000 });
     for (const line of stdout.split(/\r?\n/).map(x => x.trim()).filter(Boolean)) {
       if (!candidates.includes(line)) candidates.push(line);
     }
   } catch {}
-
   for (const fallback of ['codex.exe', 'codex.cmd', 'codex.bat', 'codex']) {
     if (!candidates.includes(fallback)) candidates.push(fallback);
   }
-
-  // Prefer native executables over shell shims.
   candidates.sort((a, b) => {
     const rank = x => /\.exe$/i.test(x) ? 0 : /\.(cmd|bat)$/i.test(x) ? 1 : 2;
     return rank(a) - rank(b);
   });
-
   return candidates;
 }
 
@@ -928,7 +862,6 @@ async function resolveCodexExecutable(codexPath) {
     } catch (error) {
       lastError = error;
       if (windowsDefaultLookup) continue;
-
       if (error?.code === 'ENOENT') break;
       const detail = error?.stderr || error?.stdout || error?.message || String(error);
       const wrapped = new Error(ui(
@@ -970,6 +903,34 @@ function isCliCompatibilityError(error) {
   );
 }
 
+function buildCodexArgs(schemaPath, model) {
+  const args = [
+    '--ask-for-approval', 'never',
+    'exec',
+    '--json',
+    '--ephemeral',
+    '--skip-git-repo-check',
+    '--ignore-user-config',
+    '--ignore-rules',
+    '--sandbox', 'read-only',
+    '--output-schema', schemaPath,
+    '--config', 'web_search="disabled"',
+    '--config', 'features.shell_tool=false',
+    '--config', 'features.unified_exec=false',
+    '--config', 'features.shell_snapshot=false',
+    '--config', 'features.apps=false',
+    '--config', 'features.multi_agent=false',
+    '--config', 'features.remote_plugin=false',
+    '--config', 'features.hooks=false',
+    '--config', 'features.goals=false',
+    '--config', 'features.memories=false',
+    '--config', 'features.skill_mcp_dependency_install=false'
+  ];
+  if (model) args.push('--model', model);
+  args.push('-');
+  return args;
+}
+
 async function runCodex(diff, options, preferredScope, previousMessage, token) {
   const resolved = await resolveCodexExecutable(options.codexPath);
   const prompt = buildPrompt(options, preferredScope, previousMessage);
@@ -985,34 +946,7 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
   return withTemporaryDirectory(async tempDir => {
     const schemaPath = path.join(tempDir, 'commit-schema.json');
     fs.writeFileSync(schemaPath, JSON.stringify(outputSchema()), { encoding: 'utf8', mode: 0o600 });
-
-    const args = [
-      'exec',
-      '--json',
-      '--ephemeral',
-      '--skip-git-repo-check',
-      '--ignore-user-config',
-      '--ignore-rules',
-      '--sandbox', 'read-only',
-      '--ask-for-approval', 'never',
-      '--output-schema', schemaPath,
-
-      // Minimal capability set for a text-in / structured-text-out task.
-      '--config', 'web_search="disabled"',
-      '--config', 'features.shell_tool=false',
-      '--config', 'features.unified_exec=false',
-      '--config', 'features.shell_snapshot=false',
-      '--config', 'features.apps=false',
-      '--config', 'features.multi_agent=false',
-      '--config', 'features.remote_plugin=false',
-      '--config', 'features.hooks=false',
-      '--config', 'features.goals=false',
-      '--config', 'features.memories=false',
-      '--config', 'features.skill_mcp_dependency_install=false'
-    ];
-
-    if (options.model) args.push('--model', options.model);
-    args.push('-');
+    const args = buildCodexArgs(schemaPath, options.model);
 
     let processResult;
     try {
@@ -1027,9 +961,9 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
       if (isCliCompatibilityError(error)) {
         const wrapped = new Error(
           ui(
-          '当前 Codex CLI 与 Codex Commit Safe 所需参数不兼容。请升级 Codex CLI 后重试。原始错误：',
-          'The current Codex CLI is incompatible with the arguments required by Codex Commit Safe. Upgrade Codex CLI and try again. Original error: '
-        ) + (error.stderr || error.message)
+            '当前 Codex CLI 与 Codex Commit Safe 所需参数不兼容。请检查 Codex CLI 版本后重试。原始错误：',
+            'The current Codex CLI is incompatible with the arguments required by Codex Commit Safe. Check the Codex CLI version and try again. Original error: '
+          ) + (error.stderr || error.message)
         );
         wrapped.code = 'ECODEXVERSION';
         throw wrapped;
@@ -1044,7 +978,6 @@ async function runCodex(diff, options, preferredScope, previousMessage, token) {
     } catch {
       throw new Error(ui('Codex 最终 agent_message 不是符合 output schema 的 JSON。', 'The final Codex agent_message is not JSON matching the output schema.'));
     }
-
     return validateStructuredResult(parsed);
   });
 }
@@ -1058,23 +991,19 @@ async function setCommitInput(repositoryInfo, message) {
     vscode.scm.inputBox.value = message;
     return;
   }
-  throw new Error(
-    ui(
-      '无法可靠定位多仓库工作区的 Git Commit 输入框；为避免写错仓库，已拒绝写入。',
-      'Cannot reliably identify the Git commit input in a multi-repository workspace; refusing to write to avoid targeting the wrong repository.'
-    )
-  );
+  throw new Error(ui(
+    '无法可靠定位多仓库工作区的 Git Commit 输入框；为避免写错仓库，已拒绝写入。',
+    'Cannot reliably identify the Git commit input in a multi-repository workspace; refusing to write to avoid targeting the wrong repository.'
+  ));
 }
 
 function getCurrentCommitInput(repositoryInfo) {
   if (repositoryInfo.repo?.inputBox) return repositoryInfo.repo.inputBox.value || '';
   if (repositoryInfo.repositoryCount === 1) return vscode.scm.inputBox.value || '';
-  throw new Error(
-    ui(
-      '无法可靠读取多仓库工作区的 Git Commit 输入框；请确保 VS Code 内置 Git 扩展可用。',
-      'Cannot reliably read the Git commit input in a multi-repository workspace. Make sure the built-in VS Code Git extension is available.'
-    )
-  );
+  throw new Error(ui(
+    '无法可靠读取多仓库工作区的 Git Commit 输入框；请确保 VS Code 内置 Git 扩展可用。',
+    'Cannot reliably read the Git commit input in a multi-repository workspace. Make sure the built-in VS Code Git extension is available.'
+  ));
 }
 
 function beginGeneration(repoRoot) {
@@ -1084,7 +1013,6 @@ function beginGeneration(repoRoot) {
     previous.cancelSource.cancel();
     previous.cancelSource.dispose();
   }
-
   const state = {
     id: nextGenerationId++,
     cancelSource: new vscode.CancellationTokenSource()
@@ -1115,7 +1043,6 @@ function linkCancellation(externalToken, internalSource) {
 
 async function generate({ regenerate = false, commandArgs = [] } = {}) {
   assertTrustedWorkspace();
-
   const repositoryInfo = await chooseRepository(commandArgs);
   if (!repositoryInfo) return;
 
@@ -1136,11 +1063,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
       async (_progress, uiToken) => {
         const linked = linkCancellation(uiToken, state.cancelSource);
         const token = state.cancelSource.token;
-
         try {
-          // The cached diff is a function of HEAD + INDEX, not INDEX alone.
-          // Snapshot both around input collection so a commit/reset/checkout cannot
-          // produce a mixed diff even when the index fingerprint stays unchanged.
           const snapshotBefore = await getRepositorySnapshot(repoRoot, token);
 
           if (
@@ -1158,12 +1081,10 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
           const snapshotAfter = await getRepositorySnapshot(repoRoot, token);
 
           if (!repositorySnapshotsEqual(snapshotBefore, snapshotAfter)) {
-            const error = new Error(
-              ui(
-                'Git HEAD 或 staged changes 在采集过程中发生变化，请重新生成 Commit Message。',
-                'Git HEAD or staged changes changed while collecting input. Generate the Commit Message again.'
-              )
-            );
+            const error = new Error(ui(
+              'Git HEAD 或 staged changes 在采集过程中发生变化，请重新生成 Commit Message。',
+              'Git HEAD or staged changes changed while collecting input. Generate the Commit Message again.'
+            ));
             error.code = 'EREPOSITORYCHANGED';
             throw error;
           }
@@ -1197,21 +1118,13 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
               ui('打开设置', 'Open Settings')
             );
             if (action === ui('打开设置', 'Open Settings')) {
-              vscode.commands.executeCommand(
-                'workbench.action.openSettings',
-                'safeCodexCommit.maxDiffBytes'
-              );
+              vscode.commands.executeCommand('workbench.action.openSettings', 'safeCodexCommit.maxDiffBytes');
             }
             return undefined;
           }
 
-          const preferredScope = options.autoInferScope
-            ? inferScope(stagedPaths, options.scopes)
-            : '';
-
-          const previousMessage = regenerate
-            ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 2000)
-            : '';
+          const preferredScope = options.autoInferScope ? inferScope(stagedPaths, options.scopes) : '';
+          const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 2000) : '';
 
           const structured = await runCodex(
             diff,
@@ -1229,32 +1142,21 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
     );
 
     if (!generationResult) return;
-
-    // Gate 1: a newer request for the same repository supersedes this result.
     if (!isCurrentGeneration(key, state.id)) {
       log('stale generation discarded');
       return;
     }
 
-    // Gate 2: HEAD + INDEX must still match the stable repository snapshot
-    // that produced the diff sent to Codex. This also detects a `git commit`
-    // where the index remains unchanged but HEAD advances.
     const currentRepositorySnapshot = await getRepositorySnapshot(repoRoot);
-    if (!repositorySnapshotsEqual(
-      currentRepositorySnapshot,
-      generationResult.repositorySnapshot
-    )) {
+    if (!repositorySnapshotsEqual(currentRepositorySnapshot, generationResult.repositorySnapshot)) {
       log('generation discarded: Git HEAD or staged index changed');
-      vscode.window.showWarningMessage(
-        ui(
-          'Git HEAD 或 staged changes 在生成过程中发生变化，已丢弃旧结果。请重新生成 Commit Message。',
-          'Git HEAD or staged changes changed during generation. The stale result was discarded; generate the Commit Message again.'
-        )
-      );
+      vscode.window.showWarningMessage(ui(
+        'Git HEAD 或 staged changes 在生成过程中发生变化，已丢弃旧结果。请重新生成 Commit Message。',
+        'Git HEAD or staged changes changed during generation. The stale result was discarded; generate the Commit Message again.'
+      ));
       return;
     }
 
-    // Recheck generation id after the async git command above.
     if (!isCurrentGeneration(key, state.id)) {
       log('stale generation discarded after index verification');
       return;
@@ -1273,12 +1175,8 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
 
 async function checkEnvironment() {
   assertTrustedWorkspace();
-
   const repositories = await getRepositories();
-  const repoRoot = repositories[0]?.root ||
-    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-    process.cwd();
-
+  const repoRoot = repositories[0]?.root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
   const options = getEffectiveOptions(repoRoot);
   const resolved = await resolveCodexExecutable(options.codexPath);
 
@@ -1290,12 +1188,10 @@ async function checkEnvironment() {
   }
 
   log(`environment ok: codex=${resolved.version || 'detected'}, git=detected`);
-  vscode.window.showInformationMessage(
-    ui(
-      `Codex Commit Safe 环境正常：${resolved.version || resolved.executable}；${gitVersion}`,
-      `Codex Commit Safe environment is ready: ${resolved.version || resolved.executable}; ${gitVersion}`
-    )
-  );
+  vscode.window.showInformationMessage(ui(
+    `Codex Commit Safe 环境正常：${resolved.version || resolved.executable}；${gitVersion}`,
+    `Codex Commit Safe environment is ready: ${resolved.version || resolved.executable}; ${gitVersion}`
+  ));
 }
 
 function friendlyError(error) {
@@ -1382,6 +1278,7 @@ module.exports = {
     inferScope,
     readProjectRules,
     buildPrompt,
+    buildCodexArgs,
     outputSchema,
     parseCodexJsonl,
     validateStructuredResult,
