@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   finalize:
-    if: github.event.head_commit.message == 'fix: support current Codex CLI and refine regenerate action'
+    if: startsWith(github.event.head_commit.message, 'fix: support current Codex CLI and refine regenerate action')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
