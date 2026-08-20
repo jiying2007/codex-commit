@@ -8,10 +8,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Validate release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -50,6 +55,7 @@ jobs:
   integration-latest:
     name: Extension Host / ${{ matrix.os }} / latest
     needs: validate
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +93,7 @@ jobs:
     name: Extension Host / Ubuntu / VS Code 1.90.0
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       VSCODE_TEST_VERSION: '1.90.0'
     steps:
@@ -114,6 +121,7 @@ jobs:
     name: Package and publish
     needs: [validate, integration-latest, integration-minimum]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -156,9 +164,15 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ needs.validate.outputs.version }}"
-          gh release create "$GITHUB_REF_NAME" \
-            "codex-commit-safe-${version}.vsix" \
-            SHA256SUMS \
-            --title "Codex Commit Safe ${version}" \
-            --generate-notes \
-            --verify-tag
+          vsix="codex-commit-safe-${version}.vsix"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; refreshing artifacts for a safe rerun."
+            gh release upload "$GITHUB_REF_NAME" "$vsix" SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "$vsix" \
+              SHA256SUMS \
+              --title "Codex Commit Safe ${version}" \
+              --generate-notes \
+              --verify-tag
+          fi
