@@ -4,13 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Git tag to publish, for example v1.2.2'
+        description: 'Git tag to publish, for example v1.2.3'
         required: true
-        default: 'v1.2.2'
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: vscode-marketplace-${{ inputs.tag }}
@@ -20,8 +18,7 @@ jobs:
   publish:
     name: Publish to VS Code Marketplace
     runs-on: ubuntu-latest
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    timeout-minutes: 15
     steps:
       - name: Resolve immutable release tag
         id: release
@@ -76,12 +73,14 @@ jobs:
           sha256sum "$vsix"
 
       - name: Publish Marketplace extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         shell: bash
         run: |
           set -euo pipefail
+          test -n "${VSCE_PAT:-}" || {
+            echo 'VSCE_PAT is required for Marketplace publishing. Configure the repository secret before running this workflow.' >&2
+            exit 1
+          }
           vsix="codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
-          if [[ -n "${VSCE_PAT:-}" ]]; then
-            ./node_modules/.bin/vsce publish --packagePath "$vsix" --pat "$VSCE_PAT" --skip-duplicate
-          else
-            npx --yes @vscode/vsce@3.9.3-5 publish --packagePath "$vsix" --oidc --skip-duplicate
-          fi
+          ./node_modules/.bin/vsce publish --packagePath "$vsix" --pat "$VSCE_PAT" --skip-duplicate
