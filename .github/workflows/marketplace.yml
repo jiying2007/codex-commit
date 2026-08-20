@@ -1,21 +1,19 @@
 name: VS Code Marketplace
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Git tag to publish, for example v1.2.1'
+        description: 'Git tag to publish, for example v1.2.2'
         required: true
-        default: 'v1.2.1'
+        default: 'v1.2.2'
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: vscode-marketplace-${{ github.event.release.tag_name || inputs.tag }}
+  group: vscode-marketplace-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -30,11 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
-            tag='${{ github.event.release.tag_name }}'
-          else
-            tag='${{ inputs.tag }}'
-          fi
+          tag='${{ inputs.tag }}'
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "tag must be vMAJOR.MINOR.PATCH: $tag" >&2
             exit 1
@@ -87,10 +81,7 @@ jobs:
           set -euo pipefail
           vsix="codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
           if [[ -n "${VSCE_PAT:-}" ]]; then
-            echo 'Publishing with VSCE_PAT using stable @vscode/vsce 3.9.2.'
             ./node_modules/.bin/vsce publish --packagePath "$vsix" --pat "$VSCE_PAT" --skip-duplicate
           else
-            echo 'VSCE_PAT is not configured; using GitHub OIDC Trusted Publishing.'
-            echo 'Marketplace policy must match publisher jiying2007, repository jiying2007/codex-commit, workflow marketplace.yml.'
             npx --yes @vscode/vsce@3.9.3-5 publish --packagePath "$vsix" --oidc --skip-duplicate
           fi

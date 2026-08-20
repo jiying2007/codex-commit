@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2
+
+- Fix compatibility with current Codex CLI by placing `--ask-for-approval never` before the `exec` subcommand while preserving the existing read-only/minimal-capability safety boundary.
+- Add unit and cross-platform Extension Host regression checks for the Codex CLI argument boundary.
+- Change the Regenerate Source Control action icon from `refresh` to `redo` to avoid visual collision with Git Refresh.
+
 ## 1.2.1
 
 Maintenance-closure release.

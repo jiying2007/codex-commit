@@ -112,7 +112,7 @@ codex --version
 Download the VSIX from the GitHub Release and install it:
 
 ```bash
-code --install-extension codex-commit-safe-1.2.1.vsix
+code --install-extension codex-commit-safe-1.2.2.vsix
 ```
 
 Or in VS Code:

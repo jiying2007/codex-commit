@@ -53,6 +53,20 @@ function spawnGit(args, cwd) {
   assert.match(promptZh, /Use Simplified Chinese/);
   assert.match(promptEn, /Use English/);
 
+  // Current Codex CLI requires approval policy before the exec subcommand.
+  const cliArgs = __test.buildCodexArgs('/tmp/schema.json', 'gpt-test');
+  const execIndex = cliArgs.indexOf('exec');
+  const approvalIndex = cliArgs.indexOf('--ask-for-approval');
+  assert.ok(approvalIndex >= 0 && approvalIndex < execIndex, '--ask-for-approval must be before exec');
+  for (const flag of [
+    '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config',
+    '--ignore-rules', '--sandbox', '--output-schema', '--config', '--model'
+  ]) {
+    const index = cliArgs.indexOf(flag);
+    assert.ok(index > execIndex, `${flag} must remain after exec`);
+  }
+  assert.strictEqual(cliArgs.at(-1), '-');
+
   // Scope inference.
   assert.strictEqual(__test.inferScope(['modules/wifi/wowl.c'], ['wifi', 'motor']), 'wifi');
   assert.strictEqual(__test.inferScope(['wifi/a.c', 'motor/b.c'], ['wifi', 'motor']), '');
