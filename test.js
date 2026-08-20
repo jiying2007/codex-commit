@@ -115,6 +115,20 @@ function spawnGit(args, cwd) {
   );
   assert.throws(() => __test.validateScopeHints({ camera: ['isp'] }, ['power'], 'scopeHints'));
   assert.throws(() => __test.validateScopeHints({ power: ['bad\nhint'] }, ['power'], 'scopeHints'));
+  assert.deepStrictEqual(
+    __test.filterScopeHints(
+      { power: ['suspend'], camera: ['isp'] },
+      ['navigation']
+    ),
+    {}
+  );
+  assert.deepStrictEqual(
+    __test.filterScopeHints(
+      { power: ['suspend'], camera: ['isp'] },
+      ['power']
+    ),
+    { power: ['suspend'] }
+  );
   assert.strictEqual(__test.validateScopePolicy('flexible'), 'flexible');
   assert.strictEqual(__test.validateScopePolicy('strict'), 'strict');
   assert.throws(() => __test.validateScopePolicy('legacy'));

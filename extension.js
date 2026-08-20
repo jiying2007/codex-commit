@@ -172,6 +172,13 @@ function mergeScopeHints(base, override) {
   return result;
 }
 
+function filterScopeHints(scopeHints, scopes) {
+  const allowed = new Set(scopes);
+  return Object.fromEntries(
+    Object.entries(scopeHints || {}).filter(([scope]) => allowed.has(scope))
+  );
+}
+
 function validateScopePolicy(value) {
   const policy = String(value ?? 'flexible').trim();
   if (!['flexible', 'strict'].includes(policy)) {
@@ -952,8 +959,18 @@ function getEffectiveOptions(repoRoot) {
     throw new Error(ui(`language 不支持：${language}`, `Unsupported language: ${language}`));
   }
 
-  const scopes = validateScopes(project.scopes, config.get('scopes', []));
-  const userScopeHints = validateScopeHints(config.get('scopeHints', {}), scopes, 'safeCodexCommit.scopeHints');
+  const configuredScopes = validateScopes(config.get('scopes', []), []);
+  const scopes = validateScopes(project.scopes, configuredScopes);
+  const configuredScopeHints = validateScopeHints(
+    config.get('scopeHints', {}),
+    configuredScopes,
+    'safeCodexCommit.scopeHints'
+  );
+  // A repository may intentionally replace the configured scope list. User/workspace
+  // hints for scopes outside that effective project list are irrelevant, not errors.
+  const userScopeHints = filterScopeHints(configuredScopeHints, scopes);
+  // Repository-owned hints, however, must be internally consistent with the
+  // repository's effective scopes and therefore remain fail-closed.
   const projectScopeHints = validateScopeHints(project.scopeHints, scopes, `${PROJECT_RULES_FILE}.scopeHints`);
   const scopeHints = mergeScopeHints(userScopeHints, projectScopeHints);
   const scopePolicy = validateScopePolicy(project.scopePolicy ?? config.get('scopePolicy', 'flexible'));
@@ -1648,6 +1665,7 @@ module.exports = {
     validateScopes,
     validateScopeHints,
     mergeScopeHints,
+    filterScopeHints,
     validateScopePolicy,
     validateExtraInstructions,
     isChineseUi,
