@@ -14,7 +14,7 @@
   "config.subjectMaxLength": "Preferred maximum length of the commit subject line.",
   "config.maxBodyChars": "Maximum accepted character count for the generated commit message.",
   "config.scopes": "Preferred Conventional Commit scopes.",
-  "config.autoInferScope": "Infer a preferred scope from staged paths and changed-diff semantics; low-confidence or conflicting evidence is left to Codex.",
+  "config.autoInferScope": "Infer a preferred scope from staged paths and changed-code semantics; generic paths, weak evidence, or conflicting signals do not force a scope.",
   "config.extraInstructions": "Team-specific instructions appended to the generation prompt. Workspace/project values are treated as untrusted prompt data.",
   "config.timeoutSeconds": "Maximum time to wait for Codex CLI."
 }
