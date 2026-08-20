@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.4
+
+Scope-inference correctness release.
+
+- Replace path-only scope inference with behavior-aware scoring that combines exact staged-path evidence and changed-diff semantic evidence.
+- Remove the generic `sensor` → `camera` and `service` → `system` aliases that could misclassify unrelated changes.
+- Add low-power semantic hints (`suspend`, `resume`, `wakeup`, `sleep`, and related terms) so power-management changes can prefer `power` even from generic files such as `sensor_entry.cpp`.
+- Fail open to an empty preferred scope when evidence is weak or conflicting, leaving final classification to Codex instead of forcing a misleading prior.
+- Strengthen the generation prompt so changed behavior/symbols outrank generic path aliases, with regression coverage for the SOC low-power example.
+
 ## 1.2.3
 
 Maintenance / hardening release.

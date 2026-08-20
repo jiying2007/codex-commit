@@ -112,7 +112,7 @@ codex --version
 Download the VSIX from the GitHub Release and install it:
 
 ```bash
-code --install-extension codex-commit-safe-1.2.2.vsix
+code --install-extension codex-commit-safe-1.2.4.vsix
 ```
 
 Or in VS Code:
@@ -169,7 +169,7 @@ A repository may include `.codex-commit.json`:
 }
 ```
 
-Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` and `safeCodexCommit.model` are application-scoped User Settings.
+Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` and `safeCodexCommit.model` are application-scoped User Settings. When `autoInferScope` is enabled, scope preference combines staged-path evidence with changed-diff semantics; generic filenames alone do not force a domain scope, and low-confidence/conflicting evidence is left to Codex.
 
 ## Extension identity
 

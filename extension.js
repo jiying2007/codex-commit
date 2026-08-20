@@ -24,18 +24,18 @@ const PROJECT_RULE_KEYS = new Set([
 ]);
 
 const DEFAULT_SCOPE_HINTS = {
-  bsp: ['bsp', 'board', 'boot', 'uboot', 'u-boot', 'kernel', 'platform'],
+  bsp: ['bsp', 'board', 'boot', 'uboot', 'kernel', 'platform'],
   driver: ['driver', 'drivers', 'hal'],
   wifi: ['wifi', 'wlan', 'wireless', 'wpa', 'hostap'],
   audio: ['audio', 'alsa', 'codec', 'speaker', 'mic', 'microphone'],
   motor: ['motor', 'foc', 'wheel'],
   imu: ['imu', 'gyro', 'gyroscope', 'accelerometer'],
-  ota: ['ota', 'upgrade', 'updater', 'firmware_update'],
+  ota: ['ota', 'upgrade', 'updater', 'firmware', 'upgrader'],
   mcu: ['mcu', 'gd32', 'stm32', 'mm32', 'hc32', 'esp32'],
   nand: ['nand', 'flash', 'mtd', 'ubi', 'ubifs'],
-  power: ['power', 'pmic', 'battery', 'charger', 'charging'],
-  camera: ['camera', 'isp', 'sensor', 'video'],
-  system: ['system', 'service', 'daemon', 'init']
+  power: ['power', 'pmic', 'battery', 'charger', 'charging', 'suspend', 'resume', 'wakeup', 'wake', 'sleep', 'standby', 'hibernate'],
+  camera: ['camera', 'isp', 'video', 'venc', 'vdec', 'mipi', 'csi', 'image'],
+  system: ['system', 'daemon', 'init', 'supervisor']
 };
 
 let outputChannel;
@@ -583,30 +583,83 @@ function repositorySnapshotsEqual(a, b) {
   );
 }
 
-function inferScope(paths, scopes) {
+function tokenizeScopeEvidence(text) {
+  return String(text || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function changedDiffText(diff) {
+  return String(diff || '')
+    .split(/\r?\n/)
+    .filter(line => (
+      (line.startsWith('+') && !line.startsWith('+++')) ||
+      (line.startsWith('-') && !line.startsWith('---'))
+    ))
+    .map(line => line.slice(1))
+    .join('\n');
+}
+
+function inferScope(paths, scopes, diff = '') {
   if (!paths.length || !scopes.length) return '';
-  const scores = new Map(scopes.map(scope => [scope, 0]));
+
+  const evidence = new Map(scopes.map(scope => [scope, { path: 0, semantic: 0 }]));
+  const semanticTokens = new Set(tokenizeScopeEvidence(changedDiffText(diff)));
+
   for (const file of paths) {
-    const lower = file.toLowerCase();
-    const parts = lower.split(/[\\/._-]+/).filter(Boolean);
+    const pathTokens = new Set(tokenizeScopeEvidence(file));
     for (const scope of scopes) {
-      const s = scope.toLowerCase();
-      if (parts.includes(s)) {
-        scores.set(scope, scores.get(scope) + 5);
-      } else if (lower.includes(`/${s}/`) || lower.includes(`\\${s}\\`)) {
-        scores.set(scope, scores.get(scope) + 4);
+      const key = scope.toLowerCase();
+      const score = evidence.get(scope);
+      const scopeTokens = tokenizeScopeEvidence(key);
+
+      if (scopeTokens.length && scopeTokens.every(token => pathTokens.has(token))) {
+        score.path += 10;
       }
-      for (const hint of DEFAULT_SCOPE_HINTS[s] || []) {
-        if (parts.includes(hint) || lower.includes(hint)) {
-          scores.set(scope, scores.get(scope) + 1);
+
+      const pathHints = new Set();
+      for (const hint of DEFAULT_SCOPE_HINTS[key] || []) {
+        for (const token of tokenizeScopeEvidence(hint)) {
+          if (pathTokens.has(token)) pathHints.add(token);
         }
       }
+      score.path += Math.min(pathHints.size * 4, 8);
     }
   }
-  const sorted = [...scores.entries()].sort((a, b) => b[1] - a[1]);
-  if (!sorted.length || sorted[0][1] <= 0) return '';
-  if (sorted.length > 1 && sorted[0][1] === sorted[1][1]) return '';
-  return sorted[0][0];
+
+  for (const scope of scopes) {
+    const key = scope.toLowerCase();
+    const score = evidence.get(scope);
+    const scopeTokens = tokenizeScopeEvidence(key);
+
+    if (scopeTokens.length && scopeTokens.every(token => semanticTokens.has(token))) {
+      score.semantic += 6;
+    }
+
+    const semanticHints = new Set();
+    for (const hint of DEFAULT_SCOPE_HINTS[key] || []) {
+      for (const token of tokenizeScopeEvidence(hint)) {
+        if (semanticTokens.has(token)) semanticHints.add(token);
+      }
+    }
+    score.semantic += Math.min(semanticHints.size * 2, 12);
+  }
+
+  const ranked = [...evidence.entries()]
+    .map(([scope, score]) => ({ scope, ...score, total: score.path + score.semantic }))
+    .sort((a, b) => b.total - a.total || b.semantic - a.semantic || b.path - a.path || a.scope.localeCompare(b.scope));
+
+  const top = ranked[0];
+  const second = ranked[1];
+  if (!top || top.total < 4) return '';
+  if (second && top.total - second.total < 2) return '';
+
+  // A single weak alias is not enough. Exact path matches or semantic behavior
+  // evidence may produce a preference; otherwise leave scope classification to Codex.
+  if (top.semantic === 0 && top.path < 8) return '';
+  return top.scope;
 }
 
 function readProjectRules(repoRoot) {
@@ -701,16 +754,17 @@ function buildPrompt(options, preferredScope, previousMessage) {
     'Return exactly one object matching the provided JSON Schema.',
     'Field rules:',
     '1. type must be one of feat, fix, refactor, perf, docs, test, build, ci, chore.',
-    '2. scope must be an empty string when no reasonable scope exists.',
+    '2. scope must identify the primary changed behavior or subsystem, not merely a generic filename or containing directory; use an empty string when no reasonable scope exists.',
     `3. ${languageRule}`,
     `4. Keep the final subject line near or below ${options.subjectMaxLength} characters when practical.`,
-    '5. description should state purpose and behavior, not mechanically list filenames, and should not end with a period.',
-    '6. For simple changes return an empty body array; for complex changes include only a few important points.',
-    '7. Return only schema-defined fields, with no explanation or alternative answer.'
+    '5. Prefer semantic evidence from changed symbols and logic over weak path aliases. Generic terms such as sensor, service, entry, main, common, or core do not by themselves justify a domain scope.',
+    '6. description should state purpose and behavior, not mechanically list filenames, and should not end with a period.',
+    '7. For simple changes return an empty body array; for complex changes include only a few important points.',
+    '8. Return only schema-defined fields, with no explanation or alternative answer.'
   ];
 
   if (options.scopes.length) lines.push(`Preferred scopes: ${options.scopes.join(', ')}. Use another scope only when it is more accurate.`);
-  if (preferredScope) lines.push(`The staged paths suggest scope "${preferredScope}". Use it only when the diff supports that conclusion.`);
+  if (preferredScope) lines.push(`Local path + changed-diff heuristics suggest scope "${preferredScope}". Treat this only as a weak prior and ignore it whenever the changed behavior supports another scope.`);
   if (previousMessage) {
     lines.push(
       'This is a regeneration. Avoid repeating the previous wording verbatim when a clearer accurate wording is available.',
@@ -1186,7 +1240,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
             return undefined;
           }
 
-          const preferredScope = options.autoInferScope ? inferScope(stagedPaths, options.scopes) : '';
+          const preferredScope = options.autoInferScope ? inferScope(stagedPaths, options.scopes, diff) : '';
           const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 2000) : '';
 
           const structured = await runCodex(
