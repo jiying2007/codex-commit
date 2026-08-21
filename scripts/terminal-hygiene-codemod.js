@@ -1,5 +1,6 @@
 'use strict';
 
+// One-time fail-closed cleanup; removed by the trusted finalizer after validation.
 const fs = require('fs');
 const path = require('path');
 
