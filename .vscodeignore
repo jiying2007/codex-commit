@@ -14,3 +14,4 @@ PUBLISHING.md
 scripts/**
 extension.js
 src/**
+tsconfig*.json

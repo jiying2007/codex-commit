@@ -1,5 +1,18 @@
 'use strict';
 
+/**
+ * @typedef {Object} CommitStyleSummary
+ * @property {number} sampleSize
+ * @property {number} conventionalSampleSize
+ * @property {number} conventionalRatio
+ * @property {number} scopedRatio
+ * @property {number} terminalPeriodRatio
+ * @property {number} englishLowercaseRatio
+ * @property {number} englishCaseSampleSize
+ * @property {number} medianSubjectLength
+ */
+
+/** @type {ReadonlySet<string>} */
 const CONVENTIONAL_TYPES = new Set([
   'feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore'
 ]);
@@ -8,12 +21,21 @@ const SUBJECT_LIMIT_MAX = 50;
 const SUBJECT_LENGTH_MAX = 180;
 const STYLE_SAMPLE_MIN = 3;
 
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
 function clampHistoryLimit(value, fallback = 12) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(0, Math.min(SUBJECT_LIMIT_MAX, Math.round(n)));
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function normalizeSubject(value) {
   if (typeof value !== 'string') return '';
   const subject = value.trim();
@@ -22,9 +44,15 @@ function normalizeSubject(value) {
   return subject;
 }
 
+/**
+ * @param {unknown} stdout
+ * @param {number} [limit]
+ * @returns {string[]}
+ */
 function parseCommitSubjects(stdout, limit = 12) {
   const bounded = clampHistoryLimit(limit);
   if (bounded === 0) return [];
+  /** @type {string[]} */
   const result = [];
   for (const raw of String(stdout || '').split('\0')) {
     const subject = normalizeSubject(raw);
@@ -35,10 +63,19 @@ function parseCommitSubjects(stdout, limit = 12) {
   return result;
 }
 
+/**
+ * @param {number} numerator
+ * @param {number} denominator
+ * @returns {number}
+ */
 function ratio(numerator, denominator) {
   return denominator > 0 ? numerator / denominator : 0;
 }
 
+/**
+ * @param {number[]} numbers
+ * @returns {number}
+ */
 function median(numbers) {
   if (!numbers.length) return 0;
   const sorted = [...numbers].sort((a, b) => a - b);
@@ -48,8 +85,13 @@ function median(numbers) {
     : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
+/**
+ * @param {unknown[] | null | undefined} subjects
+ * @returns {CommitStyleSummary}
+ */
 function summarizeRepositoryStyle(subjects) {
   const normalized = (subjects || []).map(normalizeSubject).filter(Boolean).slice(0, SUBJECT_LIMIT_MAX);
+  /** @type {CommitStyleSummary} */
   const summary = {
     sampleSize: normalized.length,
     conventionalSampleSize: 0,
@@ -94,13 +136,22 @@ function summarizeRepositoryStyle(subjects) {
   return summary;
 }
 
+/**
+ * @param {number} value
+ * @returns {number}
+ */
 function percent(value) {
   return Math.round(value * 100);
 }
 
+/**
+ * @param {CommitStyleSummary | null | undefined} summary
+ * @returns {string[]}
+ */
 function buildRepositoryStyleGuidance(summary) {
   if (!summary || summary.sampleSize < STYLE_SAMPLE_MIN) return [];
 
+  /** @type {string[]} */
   const guidance = [];
   if (summary.conventionalSampleSize >= STYLE_SAMPLE_MIN) {
     if (summary.scopedRatio >= 0.7) {
