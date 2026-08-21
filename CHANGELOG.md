@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.3.3
+
+- Make Windows Extension Host TOCTOU tests wait for an observed fake Codex invocation instead of relying on fixed startup delays.
+
 ## 1.3.2
 
 - Automatically create the immutable version tag and GitHub Release after a committed version bump reaches `main`, while retaining the manual tag-push fallback.

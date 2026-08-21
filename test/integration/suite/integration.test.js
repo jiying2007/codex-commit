@@ -13,6 +13,19 @@ function exec(command, args, cwd) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+function invocationCount(file) {
+  return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).length;
+}
+
+async function waitForInvocation(file, previousCount, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (invocationCount(file) > previousCount) return;
+    await wait(25);
+  }
+  throw new Error(`Timed out waiting for fake Codex invocation after ${previousCount}`);
+}
+
 async function gitApi() {
   const ext = vscode.extensions.getExtension('vscode.git');
   const exp = ext.isActive ? ext.exports : await ext.activate();
@@ -34,6 +47,7 @@ async function run() {
   const repo2 = process.env.CODEX_COMMIT_IT_REPO2;
   const fake = process.env.CODEX_COMMIT_IT_FAKE_CODEX;
   const delayFile = process.env.CODEX_COMMIT_IT_DELAY_FILE;
+  const startedFile = process.env.CODEX_COMMIT_IT_STARTED_FILE;
   await setSetting('codexPath', fake);
   await setSetting('language', 'zh-CN');
   await wait(1200);
@@ -64,8 +78,9 @@ async function run() {
   await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(repo1, 'wifi.c')));
   r1.inputBox.value = '';
   fs.writeFileSync(delayFile, '800');
+  const indexInvocation = invocationCount(startedFile);
   const pending = vscode.commands.executeCommand('safeCodexCommit.generate');
-  await wait(150);
+  await waitForInvocation(startedFile, indexInvocation);
   fs.appendFileSync(path.join(repo1, 'wifi.c'), 'int wifi2 = 2;\n');
   exec('git', ['add', 'wifi.c'], repo1);
   await pending;
@@ -74,8 +89,9 @@ async function run() {
   // New request supersedes old request.
   r1.inputBox.value = '';
   fs.writeFileSync(delayFile, '800');
+  const oldInvocation = invocationCount(startedFile);
   const oldRequest = vscode.commands.executeCommand('safeCodexCommit.generate');
-  await wait(100);
+  await waitForInvocation(startedFile, oldInvocation);
   fs.writeFileSync(delayFile, '20');
   const newRequest = vscode.commands.executeCommand('safeCodexCommit.generate');
   await Promise.all([oldRequest, newRequest]);
@@ -101,8 +117,9 @@ async function run() {
   fs.appendFileSync(path.join(repo1, 'wifi.c'), 'int head_change = 5;\n');
   exec('git', ['add', 'wifi.c'], repo1);
   fs.writeFileSync(delayFile, '800');
+  const headInvocation = invocationCount(startedFile);
   const headPending = vscode.commands.executeCommand('safeCodexCommit.generate');
-  await wait(150);
+  await waitForInvocation(startedFile, headInvocation);
   exec('git', ['config', 'user.email', 'test@example.com'], repo1);
   exec('git', ['config', 'user.name', 'Codex Commit Test'], repo1);
   exec('git', ['commit', '-m', 'advance head during generation'], repo1);

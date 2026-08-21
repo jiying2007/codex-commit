@@ -20,7 +20,7 @@ function initRepo(root, file, content) {
   exec('git', ['add', file], root);
 }
 
-function fakeCodex(base, delayFile) {
+function fakeCodex(base, delayFile, startedFile) {
   const js = path.join(base, 'fake-codex.js');
   fs.writeFileSync(js, `
 const fs=require('fs');
@@ -65,6 +65,7 @@ let input='';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data',chunk=>{input+=chunk;});
 process.stdin.on('end',()=>{
+  fs.appendFileSync(${JSON.stringify(startedFile)},'started\\n');
   let delay=0;try{delay=Number(fs.readFileSync(${JSON.stringify(delayFile)},'utf8'))||0;}catch{}
   const english=input.includes('Use English for description and body.');
   const description=english?'fix integration test issue':'修复集成测试问题';
@@ -94,10 +95,12 @@ async function main() {
   const repo1 = path.join(base, 'repo1');
   const repo2 = path.join(base, 'repo2');
   const delayFile = path.join(base, 'delay.txt');
+  const startedFile = path.join(base, 'started.txt');
   fs.writeFileSync(delayFile, '10');
+  fs.writeFileSync(startedFile, '');
   initRepo(repo1, 'wifi.c', 'int wifi = 1;\n');
   initRepo(repo2, 'motor.c', 'int motor = 1;\n');
-  const fake = fakeCodex(base, delayFile);
+  const fake = fakeCodex(base, delayFile, startedFile);
   const workspace = path.join(base, 'integration.code-workspace');
   fs.writeFileSync(workspace, JSON.stringify({ folders: [{ path: repo1 }, { path: repo2 }] }, null, 2));
 
@@ -105,6 +108,7 @@ async function main() {
   process.env.CODEX_COMMIT_IT_REPO2 = repo2;
   process.env.CODEX_COMMIT_IT_FAKE_CODEX = fake;
   process.env.CODEX_COMMIT_IT_DELAY_FILE = delayFile;
+  process.env.CODEX_COMMIT_IT_STARTED_FILE = startedFile;
 
   const runOptions = {
     extensionDevelopmentPath: path.resolve(__dirname, '..', '..'),
