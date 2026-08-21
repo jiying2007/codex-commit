@@ -7,12 +7,15 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "types": [],
     "skipLibCheck": true
   },
   "include": [
     "src/commit-style.js",
-    "src/scope-intelligence.js"
+    "src/scope-intelligence.js",
+    "src/policy-validation.js"
   ]
 }
