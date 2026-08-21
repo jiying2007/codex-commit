@@ -5,7 +5,7 @@
   "command.checkEnvironment.title": "检查 Codex 环境",
   "capability.untrusted": "Codex Commit Safe 会执行 Git 和本地 Codex CLI，并读取暂存区内容，因此要求受信任工作区。",
   "capability.virtual": "Codex Commit Safe 需要本地 Git 仓库和本地 CLI 可执行文件。",
-  "config.codexPath": "Codex CLI 可执行文件路径。应用级设置：仅允许 User Settings 配置。",
+  "config.codexPath": "Codex CLI 可执行文件路径。使用 machine scope，本地与远程 Extension Host 可分别配置，仓库设置不能覆盖。",
   "config.model": "可选 Codex 模型。应用级设置：仅允许 User Settings 配置。",
   "config.language": "生成的 Commit description 和 body 使用的语言。",
   "config.language.zhCN": "简体中文",
@@ -20,5 +20,6 @@
   "config.scopeHints": "可选的 scope → 语义别名映射，仅用于本地 scope 推断。提示词是静态文本，永远不会被执行。",
   "config.scopePolicy": "控制生成的非空 scope 是否允许超出已配置 scopes。",
   "config.scopePolicy.flexible": "灵活：优先使用已配置 scopes，但 Codex 可返回其他更准确的 scope。",
-  "config.scopePolicy.strict": "严格：scope 必须为空或属于已配置 scopes。"
+  "config.scopePolicy.strict": "严格：scope 必须为空或属于已配置 scopes。",
+  "config.styleHistoryLimit": "用于本地统计提交风格的近期 Commit Subject 数量。设为 0 可关闭仓库风格学习；历史 Commit 原文不会发送给 Codex。"
 }

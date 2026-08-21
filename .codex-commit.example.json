@@ -18,6 +18,7 @@
     "system"
   ],
   "autoInferScope": true,
+  "styleHistoryLimit": 12,
   "extraInstructions": "修复缺陷优先使用 fix；新增功能使用 feat；一次提交只表达一个逻辑目的。",
   "timeoutSeconds": 90,
   "scopeHints": {

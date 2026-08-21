@@ -4,3 +4,4 @@ node_modules/
 SHA256SUMS
 .DS_Store
 .vscode-test/
+dist/

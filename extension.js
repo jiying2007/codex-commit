@@ -15,6 +15,12 @@ const {
   fingerprintPolicy,
   validateReviewReceipt
 } = require('./src/safe-contract');
+const {
+  clampHistoryLimit,
+  parseCommitSubjects,
+  summarizeRepositoryStyle,
+  buildRepositoryStyleGuidance
+} = require('./src/commit-style');
 
 const VALID_TYPES = new Set([
   'feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore'
@@ -32,7 +38,8 @@ const PROJECT_RULE_KEYS = new Set([
   'scopePolicy',
   'autoInferScope',
   'extraInstructions',
-  'timeoutSeconds'
+  'timeoutSeconds',
+  'styleHistoryLimit'
 ]);
 
 const DEFAULT_SCOPE_HINTS = {
@@ -416,6 +423,18 @@ function runProcess(command, args, options = {}, stdinText = '', cancellationTok
 
 async function git(args, cwd, token) {
   return runProcess('git', args, { cwd, timeoutMs: 15000 }, '', token);
+}
+
+async function getRepositoryStyleGuidance(repoRoot, headOid, limit, token) {
+  const bounded = clampHistoryLimit(limit);
+  if (bounded === 0 || headOid === '<unborn>') return [];
+  const { stdout } = await git(
+    ['log', '--no-merges', '-n', String(bounded), '--format=%s%x00', headOid, '--'],
+    repoRoot,
+    token
+  );
+  const subjects = parseCommitSubjects(stdout, bounded);
+  return buildRepositoryStyleGuidance(summarizeRepositoryStyle(subjects));
 }
 
 function runProcessBuffer(command, args, options = {}, cancellationToken) {
@@ -1035,6 +1054,7 @@ async function getEffectiveOptions(repoRoot, headOid, token) {
     scopeHints,
     scopePolicy,
     autoInferScope: typeof project.autoInferScope === 'boolean' ? project.autoInferScope : Boolean(config.get('autoInferScope', true)),
+    styleHistoryLimit: clampNumber(project.styleHistoryLimit ?? config.get('styleHistoryLimit', 12), 12, 0, 50, 'styleHistoryLimit'),
     extraInstructions,
     timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds'),
     policySource: policy.source,
@@ -1049,6 +1069,7 @@ async function getEffectiveOptions(repoRoot, headOid, token) {
     scopeHints: options.scopeHints,
     scopePolicy: options.scopePolicy,
     autoInferScope: options.autoInferScope,
+    styleHistoryLimit: options.styleHistoryLimit,
     extraInstructions: options.extraInstructions,
     timeoutSeconds: options.timeoutSeconds,
     projectPolicyFingerprint: options.projectPolicyFingerprint
@@ -1056,7 +1077,7 @@ async function getEffectiveOptions(repoRoot, headOid, token) {
   return options;
 }
 
-function buildPrompt(options, preferredScope, previousMessage) {
+function buildPrompt(options, preferredScope, previousMessage, repositoryStyleGuidance = []) {
   const languageRule = options.language === 'en'
     ? 'Use English for description and body.'
     : 'Use Simplified Chinese for description and body; keep type and scope in English.';
@@ -1085,6 +1106,13 @@ function buildPrompt(options, preferredScope, previousMessage) {
     lines.push(`Preferred scopes: ${options.scopes.join(', ')}. Use another scope only when it is more accurate.`);
   }
   if (preferredScope) lines.push(`Local path + changed-diff intelligence suggests scope "${preferredScope}" with sufficient confidence. Treat this as a prior, not an instruction; ignore it whenever the full diff supports another scope unless strict scope policy applies.`);
+  if (repositoryStyleGuidance.length) {
+    lines.push(
+      'Repository style prior (locally derived from fixed statistics over recent commit subjects; no raw historical commit text is included):',
+      ...repositoryStyleGuidance.map(item => `- ${item}`),
+      'Treat this only as a weak style preference. It never overrides safety constraints, field rules, scope policy, language selection, or the staged diff.'
+    );
+  }
   if (previousMessage) {
     lines.push(
       'This is a regeneration. Avoid repeating the previous wording verbatim when a clearer accurate wording is available.',
@@ -1314,9 +1342,9 @@ function buildCodexArgs(schemaPath, model) {
   return buildSafeCodexArgs(schemaPath, model);
 }
 
-async function runCodex(diff, options, preferredScope, previousMessage, token) {
+async function runCodex(diff, options, preferredScope, previousMessage, repositoryStyleGuidance, token) {
   const resolved = await resolveCodexExecutable(options.codexPath);
-  const prompt = buildPrompt(options, preferredScope, previousMessage);
+  const prompt = buildPrompt(options, preferredScope, previousMessage, repositoryStyleGuidance);
   const stdin = [
     prompt,
     '',
@@ -1530,12 +1558,20 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
           if (options.autoInferScope) log(summarizeScopeDecision(scopeDecision));
           const preferredScope = scopeDecision.scope;
           const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 2000) : '';
+          const repositoryStyleGuidance = await getRepositoryStyleGuidance(
+            repoRoot,
+            snapshotAfter.headOid,
+            options.styleHistoryLimit,
+            token
+          );
+          if (repositoryStyleGuidance.length) log(`repository style prior prepared: rules=${repositoryStyleGuidance.length}`);
 
           const structured = await runCodex(
             diff,
             options,
             preferredScope,
             previousMessage,
+            repositoryStyleGuidance,
             token
           );
 
@@ -1715,6 +1751,7 @@ module.exports = {
     getHeadOid,
     getRepositorySnapshot,
     repositorySnapshotsEqual,
+    getRepositoryStyleGuidance,
     getReviewEvidence
   }
 };

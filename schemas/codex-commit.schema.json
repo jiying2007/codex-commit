@@ -8,7 +8,10 @@
   "properties": {
     "language": {
       "type": "string",
-      "enum": ["zh-CN", "en"],
+      "enum": [
+        "zh-CN",
+        "en"
+      ],
       "description": "Language used for generated commit descriptions and bodies."
     },
     "subjectMaxLength": {
@@ -58,12 +61,21 @@
     },
     "scopePolicy": {
       "type": "string",
-      "enum": ["flexible", "strict"],
+      "enum": [
+        "flexible",
+        "strict"
+      ],
       "description": "Whether generated non-empty scopes may extend beyond the configured scopes list."
     },
     "autoInferScope": {
       "type": "boolean",
       "description": "Enable local staged-path and changed-diff scope inference."
+    },
+    "styleHistoryLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 50,
+      "description": "Number of recent commit subjects summarized locally into fixed style statistics. Set 0 to disable repository style learning."
     },
     "extraInstructions": {
       "type": "string",

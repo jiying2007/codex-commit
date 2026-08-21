@@ -5,7 +5,7 @@
   "command.checkEnvironment.title": "Check Codex Environment",
   "capability.untrusted": "Codex Commit Safe executes Git and the local Codex CLI and reads staged workspace content, so a trusted workspace is required.",
   "capability.virtual": "Codex Commit Safe requires a local Git repository and local CLI executables.",
-  "config.codexPath": "Codex CLI executable path. Application-scoped: only User Settings can configure it.",
+  "config.codexPath": "Codex CLI executable path. Machine-scoped so local and remote extension hosts can use different executables; repository settings cannot override it.",
   "config.model": "Optional Codex model. Application-scoped: only User Settings can configure it.",
   "config.language": "Language used for the generated commit description and body.",
   "config.language.zhCN": "Simplified Chinese",
@@ -20,5 +20,6 @@
   "config.scopeHints": "Optional mapping from configured scopes to semantic aliases used only by local scope inference. Hints are static text and are never executed.",
   "config.scopePolicy": "Controls whether generated non-empty scopes may go beyond the configured scopes.",
   "config.scopePolicy.flexible": "Flexible: configured scopes are preferred, but Codex may return another accurate scope.",
-  "config.scopePolicy.strict": "Strict: scope must be empty or one of the configured scopes."
+  "config.scopePolicy.strict": "Strict: scope must be empty or one of the configured scopes.",
+  "config.styleHistoryLimit": "Number of recent commit subjects summarized locally into fixed style statistics. Set 0 to disable repository style learning; raw historical commit text is never sent to Codex."
 }

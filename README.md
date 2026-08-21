@@ -14,6 +14,7 @@ Generate safe, structured Conventional Commit messages from **staged Git changes
 - VS Code commands, settings, progress, warnings, and errors are localized for **English and Simplified Chinese**
 - UI language and generated Commit Message language are independent
 - Automatic scope inference with project-configurable preferred scopes
+- Repository Style Intelligence: locally summarizes recent commit subjects into fixed statistics without sending raw history to Codex
 - Codex Structured Output with local schema validation
 - Regeneration, cancellation, timeout, multi-repository workspaces, and project-level rules
 - HEAD + raw Git index snapshot protection against stale results and TOCTOU races
@@ -81,7 +82,7 @@ SCM commit input
 
 Codex Commit Safe deliberately keeps the execution boundary narrow:
 
-- only the staged diff is sent for inference;
+- only the staged diff is sent for change inference; recent commit subjects, when style learning is enabled, are reduced locally to fixed statistics and raw history is never sent to Codex;
 - Codex runs from a temporary directory, not the repository;
 - user Codex config and project execution rules are ignored for the generation request;
 - unnecessary Codex capabilities are explicitly disabled where supported;
@@ -170,6 +171,7 @@ A repository may include `.codex-commit.json`:
     "system"
   ],
   "autoInferScope": true,
+  "styleHistoryLimit": 12,
   "scopeHints": {
     "power": ["low power", "suspend", "resume", "wakeup"],
     "camera": ["isp", "venc", "mipi"]
@@ -182,7 +184,7 @@ A repository may include `.codex-commit.json`:
 
 VS Code validates this file with the bundled `schemas/codex-commit.schema.json`, providing completion and early diagnostics for unsupported fields and invalid ranges. Runtime validation remains fail-closed and is the authority used by the extension.
 
-Only the copy committed in **HEAD** is used. Working-tree or staged policy edits do not affect the message that describes their own commit; they take effect after commit.
+Only the copy committed in **HEAD** is used. Working-tree or staged policy edits do not affect the message that describes their own commit; they take effect after commit. `styleHistoryLimit` controls how many recent subjects are summarized locally; set it to `0` to disable style learning. Raw historical subjects are never placed in the Codex prompt.
 
 Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` is machine-scoped and `safeCodexCommit.model` is application-scoped; neither can be overridden by repository policy. When `autoInferScope` is enabled, scope preference combines staged-path evidence with changed-diff semantics; generic filenames alone do not force a domain scope, and low-confidence/conflicting evidence is left to Codex.
 
@@ -216,11 +218,14 @@ Run VS Code Extension Host integration tests:
 npm run test:integration
 ```
 
-Build the official VSIX:
+Build the production bundle and official VSIX:
 
 ```bash
+npm run build
 npm run package
 ```
+
+The Marketplace/Release package loads `dist/extension.js`, produced by pinned esbuild. Source modules and development scripts are excluded from the VSIX.
 
 GitHub Actions additionally verifies:
 
