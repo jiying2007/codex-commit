@@ -157,7 +157,8 @@ function createCodexRuntime({ runProcess, runPreparedProcess, ui }) {
       throw new Error(ui('body 必须是最多 8 项的数组。', 'body must be an array with at most 8 items.'));
     }
 
-    const body = value.body.map((item) => {
+    /** @type {string[]} */
+    const body = value.body.map(/** @param {any} item */ (item) => {
       if (typeof item !== 'string') throw new Error(ui('body 每一项必须是字符串。', 'Every body item must be a string.'));
       const cleaned = item.trim().replace(/^[*-]\s*/, '').replace(/\s+/g, ' ');
       if (!cleaned || cleaned.length > 300) throw new Error(ui('body 项为空或过长。', 'A body item is empty or too long.'));
@@ -200,7 +201,8 @@ function createCodexRuntime({ runProcess, runPreparedProcess, ui }) {
       if (!candidates.includes(fallback)) candidates.push(fallback);
     }
     candidates.sort((a, b) => {
-      const rank = (value) => /\.exe$/i.test(value) ? 0 : /\.(cmd|bat)$/i.test(value) ? 1 : 2;
+      /** @type {(value: string) => number} */
+      const rank = value => /\.exe$/i.test(value) ? 0 : /\.(cmd|bat)$/i.test(value) ? 1 : 2;
       return rank(a) - rank(b);
     });
     return candidates;
