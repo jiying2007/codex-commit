@@ -1,7 +1,6 @@
 'use strict';
 
-const path = require('path');
-const { missingHelpFlags, isCliCompatibilityError } = require('./safe-contract');
+const safeCoreModule = require('./safe-core-loader');
 
 const VALID_TYPES = new Set([
   'feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore'
@@ -25,14 +24,10 @@ const VALID_TYPES = new Set([
 
 /** @returns {SafeCoreModule} */
 function loadSafeCore() {
-  // Safe Core is independently hash-locked and verified against the canonical source.
-  // Load it through a typed product boundary instead of typechecking/modifying vendored bytes.
-  const modulePath = path.join(__dirname, 'codex-safe-core', 'codex-cli');
-  const loaded = require(modulePath);
-  if (typeof loaded?.createCodexCli !== 'function' || typeof loaded?.parseCodexJsonl !== 'function') {
+  if (typeof safeCoreModule?.createCodexCli !== 'function' || typeof safeCoreModule?.parseCodexJsonl !== 'function') {
     throw new TypeError('Safe Core v1 does not expose the expected Codex CLI interface.');
   }
-  return /** @type {SafeCoreModule} */ (loaded);
+  return safeCoreModule;
 }
 
 /** @param {{ runPreparedProcess: RunPreparedProcessFn, ui: UiFn }} deps */
@@ -213,7 +208,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     } catch (error) {
       const err = /** @type {any} */ (error);
       const missingFlags = Array.isArray(err?.missingFlags)
-        ? [...new Set(err.missingFlags.map((value) => String(value).match(/--[a-z0-9-]+/i)?.[0] || String(value)))]
+        ? [...new Set(err.missingFlags.map(/** @param {any} value */ (value) => String(value).match(/--[a-z0-9-]+/i)?.[0] || String(value)))]
         : [];
       const wrapped = /** @type {any} */ (new Error(ui(
         missingFlags.length
@@ -259,7 +254,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       return validateStructuredResult(result.parsed, options);
     } catch (error) {
       const err = /** @type {any} */ (error);
-      if (err?.code === 'ECODEXVERSION' || isCliCompatibilityError(err)) {
+      if (err?.code === 'ECODEXVERSION') {
         const wrapped = /** @type {any} */ (new Error(
           ui(
             '当前 Codex CLI 与 Codex Commit Safe 所需参数或安全配置不兼容。请运行环境检查并升级 Codex CLI 后重试。原始错误：',
@@ -289,9 +284,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     buildCodexArgs,
     runCodex,
     findWindowsCodexCandidates: cli.findWindowsCodexCandidates,
-    withTemporaryDirectory: cli.withTemporaryDirectory,
-    missingHelpFlags,
-    isCliCompatibilityError
+    withTemporaryDirectory: cli.withTemporaryDirectory
   });
 }
 

@@ -19,6 +19,9 @@
     "src/commit-style.js",
     "src/scope-intelligence.js",
     "src/policy-validation.js",
-    "src/process-runner.js"
+    "src/process-runner.js",
+    "src/git-repository.js",
+    "src/safe-core-loader.d.ts",
+    "src/commit-runtime.js"
   ]
 }

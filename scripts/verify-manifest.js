@@ -49,6 +49,22 @@ if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exac
 if (pkg.devDependencies?.typescript !== '7.0.2') fail('TypeScript must be pinned exactly to 7.0.2.');
 if (pkg.devDependencies?.['@types/node'] !== '26.2.0') fail('@types/node must be pinned exactly to 26.2.0.');
 if (pkg.scripts?.['check:types'] !== 'tsc -p tsconfig.pure.json') fail('check:types must run the strict pure-module TypeScript gate.');
+if (pkg.scripts?.['verify:safe-core'] !== 'node scripts/safe-core.js verify') fail('standard checks must expose the offline Safe Core integrity gate.');
+
+const typecheckConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.pure.json'), 'utf8'));
+for (const requiredModule of [
+  'src/commit-style.js',
+  'src/scope-intelligence.js',
+  'src/policy-validation.js',
+  'src/process-runner.js',
+  'src/git-repository.js',
+  'src/safe-core-loader.d.ts',
+  'src/commit-runtime.js'
+]) {
+  if (!(typecheckConfig.include || []).includes(requiredModule)) {
+    fail('strict TypeScript gate must include ' + requiredModule);
+  }
+}
 
 if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) {
   fail('extensionKind must be ["workspace"] so Git and Codex execute beside the workspace in Remote Development.');
