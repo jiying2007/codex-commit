@@ -42,6 +42,12 @@ runtime = replaceRegexOnce(
 );
 runtime = replaceOnce(
   runtime,
+  "err.missingFlags.map((value) => String(value).match(/--[a-z0-9-]+/i)?.[0] || String(value))",
+  "err.missingFlags.map(/** @param {any} value */ (value) => String(value).match(/--[a-z0-9-]+/i)?.[0] || String(value))",
+  'Commit runtime missing flag callback'
+);
+runtime = replaceOnce(
+  runtime,
   "if (err?.code === 'ECODEXVERSION' || isCliCompatibilityError(err)) {",
   "if (err?.code === 'ECODEXVERSION') {",
   'Commit runtime compatibility branch'
