@@ -151,32 +151,35 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Apply fail-closed codemod
-        run: node scripts/phase2-codemod.js
-      - name: Lock pinned esbuild
-        run: npm install --save-dev --save-exact esbuild@0.28.2 --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install locked dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run source, regression, manifest and bundle gates
-        run: npm run check
-      - name: Build official VSIX
-        run: npm run package
-      - name: Remove one-time finalizer and codemod
+      - id: phase2
+        name: Check whether finalization is still needed
         shell: bash
         run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('fs');
-          const file = '.github/workflows/ci.yml';
-          let text = fs.readFileSync(file, 'utf8');
-          const marker = '\n# phase2-finalizer:start\n';
-          const index = text.indexOf(marker);
-          if (index < 0) throw new Error('phase2 finalizer marker not found');
-          text = text.slice(0, index).trimEnd() + '\n';
-          fs.writeFileSync(file, text);
-          NODE
-          rm scripts/phase2-codemod.js
-      - name: Commit finalized phase 2 tree
+          if test -f scripts/phase2-codemod.js; then
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Apply fail-closed codemod
+        if: steps.phase2.outputs.needed == 'true'
+        run: node scripts/phase2-codemod.js
+      - name: Lock pinned esbuild
+        if: steps.phase2.outputs.needed == 'true'
+        run: npm install --save-dev --save-exact esbuild@0.28.2 --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install locked dependencies
+        if: steps.phase2.outputs.needed == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run source, regression, manifest and bundle gates
+        if: steps.phase2.outputs.needed == 'true'
+        run: npm run check
+      - name: Build official VSIX
+        if: steps.phase2.outputs.needed == 'true'
+        run: npm run package
+      - name: Remove one-time codemod
+        if: steps.phase2.outputs.needed == 'true'
+        run: rm scripts/phase2-codemod.js
+      - name: Commit finalized non-workflow tree
+        if: steps.phase2.outputs.needed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -193,9 +196,6 @@ jobs:
             scripts/verify-manifest.js \
             .vscodeignore \
             .gitignore \
-            .github/workflows/ci.yml \
-            .github/workflows/release.yml \
-            .github/workflows/marketplace.yml \
             README.md \
             README.zh-CN.md \
             SECURITY.md \
