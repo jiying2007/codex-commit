@@ -29,6 +29,12 @@ tsconfig.include = (tsconfig.include || []).map(value => value === 'src/safe-cor
 if (tsconfig.include.includes('src/safe-core-loader.d.ts')) fail('legacy declaration remains in tsconfig');
 write('tsconfig.pure.json', `${JSON.stringify(tsconfig, null, 2)}\n`);
 
+let manifestGate = read('scripts/verify-manifest.js');
+const legacyRequiredModule = "  'src/safe-core-loader.d.ts',";
+if (!manifestGate.includes(legacyRequiredModule)) fail('legacy Safe Core declaration gate not found');
+manifestGate = manifestGate.replace(legacyRequiredModule, "  'src/codex-safe-core/codex-cli.d.ts',");
+write('scripts/verify-manifest.js', manifestGate);
+
 const pkg = JSON.parse(read('package.json'));
 pkg.scripts.check = String(pkg.scripts.check).replace('node --check src/safe-core-loader.js && ', '');
 if (!pkg.scripts.check.includes('node --check src/codex-safe-core/codex-cli.js')) {
@@ -61,6 +67,7 @@ write('docs/SAFE_CORE.md', docs);
 for (const [file, needle] of [
   ['src/commit-runtime.js', 'safe-core-loader'],
   ['tsconfig.pure.json', 'safe-core-loader'],
+  ['scripts/verify-manifest.js', 'safe-core-loader'],
   ['package.json', 'safe-core-loader'],
   ['src/codex-safe-core/manifest.json', 'safe-core-v1'],
   ['safe-core.lock.json', 'safe-core-v1'],
