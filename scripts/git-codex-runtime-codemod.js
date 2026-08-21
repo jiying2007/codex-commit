@@ -22,7 +22,8 @@ function replaceOnce(source, from, to, label) {
 }
 
 function replaceRegexOnce(source, regex, to, label) {
-  const matches = [...source.matchAll(regex)];
+  const flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`;
+  const matches = [...source.matchAll(new RegExp(regex.source, flags))];
   if (matches.length !== 1) fail(`expected exactly one ${label}, found ${matches.length}`);
   return source.replace(regex, to);
 }
