@@ -18,6 +18,8 @@ Generate safe, structured Conventional Commit messages from **staged Git changes
 - Regeneration, cancellation, timeout, multi-repository workspaces, and project-level rules
 - HEAD + raw Git index snapshot protection against stale results and TOCTOU races
 - HEAD-pinned `.codex-commit.json` policy with a stable policy fingerprint; staged/unstaged policy edits take effect only after commit
+- Native VS Code JSON validation and completion for `.codex-commit.json`
+- Remote Development aware: the extension runs beside the workspace, and `codexPath` is machine-scoped so local and remote hosts can use different Codex executables
 - Optional Codex Review Safe receipt status for the exact staged HEAD/index snapshot; missing or stale review evidence never commits automatically
 - Windows `.exe` / `.cmd` / `.bat`, Linux, and macOS execution paths covered by CI
 - Never automatically commits, pushes, or modifies project source files
@@ -109,12 +111,14 @@ Check Codex CLI first:
 codex --version
 ```
 
+When using VS Code Remote Development (SSH, Dev Containers, Codespaces, or WSL), install/authenticate Codex where the workspace extension host runs. `safeCodexCommit.codexPath` is machine-scoped, so the remote host may use a different executable path from your local VS Code host.
+
 ## Installation
 
 Download the VSIX from the GitHub Release and install it:
 
 ```bash
-code --install-extension codex-commit-safe-1.3.1.vsix
+code --install-extension codex-commit-safe-<version>.vsix
 ```
 
 Or in VS Code:
@@ -176,9 +180,11 @@ A repository may include `.codex-commit.json`:
 }
 ```
 
+VS Code validates this file with the bundled `schemas/codex-commit.schema.json`, providing completion and early diagnostics for unsupported fields and invalid ranges. Runtime validation remains fail-closed and is the authority used by the extension.
+
 Only the copy committed in **HEAD** is used. Working-tree or staged policy edits do not affect the message that describes their own commit; they take effect after commit.
 
-Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` and `safeCodexCommit.model` are application-scoped User Settings. When `autoInferScope` is enabled, scope preference combines staged-path evidence with changed-diff semantics; generic filenames alone do not force a domain scope, and low-confidence/conflicting evidence is left to Codex.
+Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` is machine-scoped and `safeCodexCommit.model` is application-scoped; neither can be overridden by repository policy. When `autoInferScope` is enabled, scope preference combines staged-path evidence with changed-diff semantics; generic filenames alone do not force a domain scope, and low-confidence/conflicting evidence is left to Codex.
 
 Scope inference combines staged paths, hunk/function context, added code, and lower-weight deleted code on a per-file basis. Low-confidence or balanced multi-subsystem changes deliberately leave the preferred scope empty so Codex can classify the full diff. `scopeHints` adds project-specific static semantic aliases without executing them. `scopePolicy` is `flexible` by default; set it to `strict` only when non-empty generated scopes must belong to the configured `scopes` list.
 
@@ -198,7 +204,7 @@ Install the locked dependencies:
 npm ci --ignore-scripts
 ```
 
-Run syntax + unit/regression checks:
+Run syntax + unit/regression + manifest/schema checks:
 
 ```bash
 npm run check
