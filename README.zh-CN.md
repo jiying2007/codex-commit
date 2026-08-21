@@ -18,6 +18,8 @@
 - 支持重新生成、取消、超时、多仓库和项目规则
 - HEAD + Git 原始 index snapshot 防止 stale result 和 TOCTOU
 - `.codex-commit.json` 固定读取 HEAD 并记录策略指纹；staged/unstaged 策略修改在提交后才生效
+- `.codex-commit.json` 提供 VS Code 原生 JSON Schema 自动补全和即时校验
+- 支持 Remote Development：扩展运行在工作区侧，`codexPath` 使用 machine scope，本地与远程可分别指定 Codex CLI
 - 可选显示精确 HEAD/index staged 快照对应的 Codex Review Safe 凭据状态；缺失或过期凭据不会触发自动提交
 - CI 覆盖 Windows `.exe/.cmd/.bat`、Linux、macOS
 - 永远不会自动 commit、push 或修改项目源码
@@ -112,12 +114,14 @@ Codex Commit Safe 有意保持较小的执行边界：
 codex --version
 ```
 
+使用 VS Code Remote Development（SSH、Dev Containers、Codespaces 或 WSL）时，需要在**工作区 Extension Host 所在环境**安装并登录 Codex CLI。`safeCodexCommit.codexPath` 为 machine scope，因此远端路径可以和本机 VS Code 不同。
+
 ## 安装
 
 从 GitHub Release 下载 VSIX：
 
 ```bash
-code --install-extension codex-commit-safe-1.3.1.vsix
+code --install-extension codex-commit-safe-<version>.vsix
 ```
 
 或者在 VS Code 中：
@@ -177,9 +181,11 @@ Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
 }
 ```
 
+VS Code 会使用插件内置的 `schemas/codex-commit.schema.json` 对配置进行自动补全和即时诊断，提前发现未知字段、类型错误和越界数值；运行时仍会继续执行 fail-closed 校验，并以运行时规则为最终准入标准。
+
 插件只使用 **HEAD** 中已提交的配置。working-tree 或 staged 策略修改不会影响描述其自身提交的 Commit Message，而是在提交后生效。
 
-项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 和 `safeCodexCommit.model` 只能通过应用级 User Settings 配置。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
+项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 为 machine scope，`safeCodexCommit.model` 为 application scope，两者都不能被仓库策略覆盖。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
 
 Scope 推断会按文件综合 staged 路径、hunk/函数上下文、新增代码，以及较低权重的删除代码；低置信度或多子系统证据接近时会故意不提供 preferred scope，让 Codex 根据完整 diff 判断。`scopeHints` 可补充项目自己的静态语义别名，提示词不会被执行。`scopePolicy` 默认 `flexible`；只有需要强制非空 scope 必须属于已配置 `scopes` 时才设置为 `strict`。
 
@@ -199,7 +205,7 @@ Scope 推断会按文件综合 staged 路径、hunk/函数上下文、新增代�
 npm ci --ignore-scripts
 ```
 
-语法 + 单元/回归：
+语法 + 单元/回归 + manifest/schema 检查：
 
 ```bash
 npm run check
@@ -227,6 +233,18 @@ GitHub Actions 还会验证：
 
 将已提交的版本号更新合入 `main` 后，会自动运行完整发布门禁。全部 job 通过后，workflow 会在同一次运行中创建不可变的 `v<package.version>` Tag 并发布 GitHub Release。未修改版本号的普通 `main` push 不会发布；推送匹配的 `vMAJOR.MINOR.PATCH` Tag 仍作为人工回退入口。
 
+推荐的本地发布入口：
+
+```bash
+npm run release:prepare -- X.Y.Z
+git diff --check
+git diff
+npm run release:check
+npm run release:push
+```
+
+`release:prepare` 只修改 `package.json`、`package-lock.json` 和 `CHANGELOG.md`；`release:check` 要求本地 `main` 已与远端同步、只存在这三个未暂存修改、远端 tag 未占用，并完整通过 lock、测试和 VSIX 打包门禁。`release:push` 会再次执行完整门禁，创建 release commit，push `main`，并等待该精确 commit 对应的 Release workflow、不可变 tag、已发布 Release、VSIX 和 `SHA256SUMS` 全部闭环；不会创建或强制移动本地 tag。三个命令都支持 `--dry-run`；`release:push` 还支持 `--timeout-minutes N`。可选环境变量 `CODEX_RELEASE_GITHUB_TOKEN` 仅用于 API 轮询鉴权，禁止提交到仓库。
+
 `vMAJOR.MINOR.PATCH` tag 必须：
 
 - 与 `package.json.version` 完全一致；
@@ -237,6 +255,8 @@ GitHub Actions 还会验证：
 - 官方 `vsce` 打包通过。
 
 只有最终 Release job 拥有 `contents: write`，所有验证 job 都是只读权限。
+
+完整发布 Runbook、失败恢复和包边界见 [PUBLISHING.md](PUBLISHING.md)。
 
 ## License
 
