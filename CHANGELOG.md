@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a cross-platform local release CLI that prepares versions, enforces release gates, pushes `main`, and verifies the automated GitHub Release without creating local tags.
+
 ## 1.3.3
 
 - Make Windows Extension Host TOCTOU tests wait for an observed fake Codex invocation instead of relying on fixed startup delays.

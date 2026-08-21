@@ -226,6 +226,18 @@ GitHub Actions additionally verifies:
 
 Merging a committed version bump to `main` automatically runs the complete release gate. If all jobs pass, the workflow creates the immutable `v<package.version>` tag and publishes the GitHub Release in the same run. Ordinary `main` pushes with no version change do not publish. Pushing a matching `vMAJOR.MINOR.PATCH` tag remains a supported manual fallback.
 
+The recommended local release entry point is:
+
+```bash
+npm run release:prepare -- X.Y.Z
+git diff --check
+git diff
+npm run release:check
+npm run release:push
+```
+
+`release:prepare` updates only `package.json`, `package-lock.json`, and `CHANGELOG.md`. `release:check` requires a synchronized `main`, exactly those three unstaged changes, an unused remote tag, and successful lock, test, and VSIX packaging gates. `release:push` reruns the complete gate, creates the release commit, pushes `main`, and waits for the exact commit's Release workflow, immutable tag, published Release, VSIX, and `SHA256SUMS`. It never creates or force-moves a local tag. Use `--dry-run` with any release command to inspect its planned behavior; `release:push` also accepts `--timeout-minutes N`. `CODEX_RELEASE_GITHUB_TOKEN` is optional for authenticated API polling and must never be committed.
+
 A `vMAJOR.MINOR.PATCH` tag must:
 
 - exactly match `package.json.version`;
@@ -236,6 +248,8 @@ A `vMAJOR.MINOR.PATCH` tag must:
 - package successfully with the official `vsce` tool.
 
 Only the final release job receives `contents: write`; all validation jobs are read-only.
+
+See [PUBLISHING.md](PUBLISHING.md) for the complete release runbook, failure recovery, package boundary, and manual fallback.
 
 ## License
 

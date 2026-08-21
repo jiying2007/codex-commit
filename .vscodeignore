@@ -10,4 +10,5 @@ test/**
 .gitignore
 .gitattributes
 package-lock.json
+PUBLISHING.md
 scripts/**
