@@ -33,6 +33,8 @@ jobs:
           node-version: '22'
           cache: npm
       - id: version
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
         shell: bash
         run: |
           set -euo pipefail
@@ -59,15 +61,21 @@ jobs:
               echo "unexpected release branch: $GITHUB_REF_NAME" >&2
               exit 1
             }
-            previous_version=$(git show "${GITHUB_SHA}^1:package.json" 2>/dev/null | node -e "let s='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(s).version||'')}catch{}})" || true)
+            previous_version=""
+            if [[ "$GITHUB_EVENT_BEFORE" =~ ^[0-9a-f]{40}$ && ! "$GITHUB_EVENT_BEFORE" =~ ^0+$ ]]; then
+              previous_version=$(git show "${GITHUB_EVENT_BEFORE}:package.json" 2>/dev/null | node -e "let s='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(s).version||'')}catch{}})" || true)
+            fi
             if [[ "$previous_version" == "$version" ]]; then
               publish=false
               echo "package version is unchanged at $version; no release will be published."
             else
-              existing=$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')
-              if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
-                echo "release tag $tag already points to a different commit: $existing" >&2
-                exit 1
+              if git ls-remote --exit-code --refs origin "refs/tags/$tag" >/dev/null 2>&1; then
+                git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+                existing=$(git rev-list -n 1 "$tag")
+                test "$existing" = "$GITHUB_SHA" || {
+                  echo "release tag $tag already points to a different commit: $existing" >&2
+                  exit 1
+                }
               fi
             fi
           fi
@@ -96,6 +104,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
@@ -198,7 +207,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha' 2>/dev/null); then
+          if git ls-remote --exit-code --refs origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+            existing=$(git rev-list -n 1 "$RELEASE_TAG")
             test "$existing" = "$GITHUB_SHA" || {
               echo "release tag $RELEASE_TAG points to $existing, expected $GITHUB_SHA" >&2
               exit 1

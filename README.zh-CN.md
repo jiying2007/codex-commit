@@ -225,6 +225,8 @@ GitHub Actions 还会验证：
 
 ## 发布门禁
 
+将已提交的版本号更新合入 `main` 后，会自动运行完整发布门禁。全部 job 通过后，workflow 会在同一次运行中创建不可变的 `v<package.version>` Tag 并发布 GitHub Release。未修改版本号的普通 `main` push 不会发布；推送匹配的 `vMAJOR.MINOR.PATCH` Tag 仍作为人工回退入口。
+
 `vMAJOR.MINOR.PATCH` tag 必须：
 
 - 与 `package.json.version` 完全一致；

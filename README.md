@@ -224,6 +224,8 @@ GitHub Actions additionally verifies:
 
 ## Release policy
 
+Merging a committed version bump to `main` automatically runs the complete release gate. If all jobs pass, the workflow creates the immutable `v<package.version>` tag and publishes the GitHub Release in the same run. Ordinary `main` pushes with no version change do not publish. Pushing a matching `vMAJOR.MINOR.PATCH` tag remains a supported manual fallback.
+
 A `vMAJOR.MINOR.PATCH` tag must:
 
 - exactly match `package.json.version`;

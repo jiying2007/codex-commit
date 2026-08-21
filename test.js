@@ -403,6 +403,15 @@ exit 9
   );
   assert.ok(Date.now() - start < 3000);
 
+  // Release automation is version-driven on main and remains rerun-safe.
+  const releaseWorkflow = fs.readFileSync(path.join(__dirname, '.github', 'workflows', 'release.yml'), 'utf8');
+  assert.match(releaseWorkflow, /branches:\s*\n\s*- main/);
+  assert.match(releaseWorkflow, /tags:\s*\n\s*- 'v\*'/);
+  assert.match(releaseWorkflow, /GITHUB_EVENT_BEFORE: \$\{\{ github\.event\.before \}\}/);
+  assert.match(releaseWorkflow, /name: Ensure release tag/);
+  assert.match(releaseWorkflow, /gh api --method POST/);
+  assert.match(releaseWorkflow, /gh release upload .*--clobber/);
+
   console.log(`All Codex Commit Safe ${pkg.version} unit/regression tests passed.`);
 })().catch(err => {
   console.error(err);

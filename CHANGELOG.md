@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.3.2
+
+- Automatically create the immutable version tag and GitHub Release after a committed version bump reaches `main`, while retaining the manual tag-push fallback.
+- Detect multi-commit version bumps from the push `before` revision and safely resolve existing lightweight or annotated tags to their target commit.
+
 - Pin `.codex-commit.json` to the captured HEAD and expose its fingerprint in the generation policy context.
 - Use the versioned Codex Safe argv/compatibility contract shared with Review and PR.
 - Show whether the latest Codex Review Safe receipt matches the exact staged HEAD/index snapshot.
