@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 const { createCommitRuntime, loadSafeCore } = require('../src/commit-runtime');
-const { REQUIRED_CODEX_TOP_LEVEL_FLAGS, REQUIRED_CODEX_EXEC_FLAGS } = require('../src/safe-contract');
+const { REQUIRED_CODEX_TOP_LEVEL_FLAGS, REQUIRED_CODEX_EXEC_FLAGS } = require('../src/codex-safe-core/safe-contract');
 
 const ui = (_zh, en) => en;
 const calls = [];

@@ -7,7 +7,7 @@ const {
   isCliCompatibilityError,
   fingerprintPolicy,
   validateReviewReceipt
-} = require('./src/safe-contract');
+} = require('./src/codex-safe-core/safe-contract');
 const {
   tokenizeScopeEvidence,
   parseScopeDiffSections,
