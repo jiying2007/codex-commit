@@ -16,6 +16,7 @@
     "skipLibCheck": true
   },
   "include": [
+    "src/safe-contract.js",
     "src/commit-style.js",
     "src/scope-intelligence.js",
     "src/policy-validation.js",
