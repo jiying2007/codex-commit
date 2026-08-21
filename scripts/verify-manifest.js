@@ -47,6 +47,7 @@ if (validation.url !== './schemas/codex-commit.schema.json') fail(`unexpected js
 if (pkg.main !== './dist/extension.js') fail('package main must point to the bundled dist/extension.js entry.');
 if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exactly to 0.28.2.');
 if (pkg.devDependencies?.typescript !== '7.0.2') fail('TypeScript must be pinned exactly to 7.0.2.');
+if (pkg.devDependencies?.['@types/node'] !== '26.2.0') fail('@types/node must be pinned exactly to 26.2.0.');
 if (pkg.scripts?.['check:types'] !== 'tsc -p tsconfig.pure.json') fail('check:types must run the strict pure-module TypeScript gate.');
 
 if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) {
