@@ -6,6 +6,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'schemas', 'codex-commit.schema.json');
+const extensionPath = path.join(root, 'extension.js');
 
 function fail(message) {
   console.error(`manifest verification failed: ${message}`);
@@ -32,6 +33,14 @@ if (JSON.stringify(schemaKeys) !== JSON.stringify(expectedProjectKeys)) {
   fail(`project policy schema keys drifted: ${JSON.stringify(schemaKeys)}`);
 }
 if (schema.additionalProperties !== false) fail('project policy schema must fail closed on unknown keys.');
+
+const extensionSource = fs.readFileSync(extensionPath, 'utf8');
+const policySet = extensionSource.match(/const PROJECT_RULE_KEYS = new Set\(\[([\s\S]*?)\]\);/);
+if (!policySet) fail('could not locate PROJECT_RULE_KEYS in extension.js.');
+const runtimeProjectKeys = [...policySet[1].matchAll(/'([^']+)'/g)].map(match => match[1]).sort();
+if (JSON.stringify(runtimeProjectKeys) !== JSON.stringify(expectedProjectKeys)) {
+  fail(`PROJECT_RULE_KEYS drifted from the schema: ${JSON.stringify(runtimeProjectKeys)}`);
+}
 
 const validation = (pkg.contributes?.jsonValidation || []).find(item => item.fileMatch === '.codex-commit.json');
 if (!validation) fail('package.json must register jsonValidation for .codex-commit.json.');
