@@ -1,0 +1,72 @@
+name: Apply Style Intelligence Bundle
+
+on:
+  push:
+    branches:
+      - feat/style-intelligence-bundle
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase2-style-intelligence
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'feat: add repository style intelligence and bundled runtime'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/style-intelligence-bundle
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Apply fail-closed codemod
+        run: node scripts/phase2-codemod.js
+      - name: Lock pinned esbuild
+        run: npm install --save-dev --save-exact esbuild@0.28.2 --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run source, regression, manifest and bundle gates
+        run: npm run check
+      - name: Build official VSIX
+        run: npm run package
+      - name: Remove one-time migration files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/phase2-apply.yml
+          rm scripts/phase2-codemod.js
+      - name: Commit finalized phase 2 tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            extension.js \
+            package.json \
+            package-lock.json \
+            package.nls.json \
+            package.nls.zh-cn.json \
+            .codex-commit.example.json \
+            schemas/codex-commit.schema.json \
+            scripts/verify-manifest.js \
+            .vscodeignore \
+            .gitignore \
+            .github/workflows/ci.yml \
+            .github/workflows/release.yml \
+            .github/workflows/marketplace.yml \
+            README.md \
+            README.zh-CN.md \
+            SECURITY.md \
+            .github/workflows/phase2-apply.yml \
+            scripts/phase2-codemod.js
+          git diff --cached --check
+          git commit -m 'feat: add repository style intelligence and bundled runtime'
+          git push origin HEAD:feat/style-intelligence-bundle
