@@ -12,3 +12,5 @@ test/**
 package-lock.json
 PUBLISHING.md
 scripts/**
+extension.js
+src/**

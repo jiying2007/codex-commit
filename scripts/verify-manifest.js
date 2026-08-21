@@ -26,7 +26,8 @@ const expectedProjectKeys = [
   'scopePolicy',
   'autoInferScope',
   'extraInstructions',
-  'timeoutSeconds'
+  'timeoutSeconds',
+  'styleHistoryLimit'
 ].sort();
 const schemaKeys = Object.keys(schema.properties || {}).sort();
 if (JSON.stringify(schemaKeys) !== JSON.stringify(expectedProjectKeys)) {
@@ -45,6 +46,9 @@ if (JSON.stringify(runtimeProjectKeys) !== JSON.stringify(expectedProjectKeys)) 
 const validation = (pkg.contributes?.jsonValidation || []).find(item => item.fileMatch === '.codex-commit.json');
 if (!validation) fail('package.json must register jsonValidation for .codex-commit.json.');
 if (validation.url !== './schemas/codex-commit.schema.json') fail(`unexpected jsonValidation schema URL: ${validation.url}`);
+
+if (pkg.main !== './dist/extension.js') fail('package main must point to the bundled dist/extension.js entry.');
+if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exactly to 0.28.2.');
 
 if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) {
   fail('extensionKind must be ["workspace"] so Git and Codex execute beside the workspace in Remote Development.');

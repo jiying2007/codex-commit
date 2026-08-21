@@ -1,5 +1,9 @@
 # Security
 
+## Repository style history
+
+When repository style learning is enabled, Codex Commit Safe reads a bounded number of commit subjects from the exact HEAD snapshot. Those subjects are parsed locally and reduced to fixed numeric/boolean style statistics. Raw historical commit text is never appended to the Codex prompt, logged, or included in the review receipt. Set `styleHistoryLimit` to `0` to disable this feature.
+
 ## Data flow
 
 Codex Commit Safe sends only the staged Git diff and commit-generation instructions to the configured Codex service. The repository itself is never used as the Codex working directory.

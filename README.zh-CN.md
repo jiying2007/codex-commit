@@ -14,6 +14,7 @@
 - VS Code 命令、设置、进度、警告和错误提示支持 **英文 / 简体中文**自动本地化
 - **界面语言与 Commit Message 语言相互独立**
 - 自动推断 scope，并支持项目自定义推荐 scope
+- Repository Style Intelligence：仅在本地把近期 Commit Subject 归纳为固定统计特征，不把历史提交原文发送给 Codex
 - Codex Structured Output + 本地 Schema 校验
 - 支持重新生成、取消、超时、多仓库和项目规则
 - HEAD + Git 原始 index snapshot 防止 stale result 和 TOCTOU
@@ -84,7 +85,7 @@ Structured result
 
 Codex Commit Safe 有意保持较小的执行边界：
 
-- 只把 staged diff 用于推理；
+- 只把 staged diff 用于变更推理；启用仓库风格学习时，近期 Commit Subject 只在本地归纳为固定统计特征，历史提交原文不会发送给 Codex；
 - Codex 在临时目录运行，而不是在源码仓库运行；
 - 生成请求忽略用户 Codex config 和项目 execution rules；
 - 在 CLI 支持的范围内显式关闭不需要的执行、Shell、Web、App、Agent、Hook、Memory 等能力；
@@ -171,6 +172,7 @@ Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
     "system"
   ],
   "autoInferScope": true,
+  "styleHistoryLimit": 12,
   "scopeHints": {
     "power": ["low power", "suspend", "resume", "wakeup"],
     "camera": ["isp", "venc", "mipi"]
@@ -183,7 +185,7 @@ Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
 
 VS Code 会使用插件内置的 `schemas/codex-commit.schema.json` 对配置进行自动补全和即时诊断，提前发现未知字段、类型错误和越界数值；运行时仍会继续执行 fail-closed 校验，并以运行时规则为最终准入标准。
 
-插件只使用 **HEAD** 中已提交的配置。working-tree 或 staged 策略修改不会影响描述其自身提交的 Commit Message，而是在提交后生效。
+插件只使用 **HEAD** 中已提交的配置。working-tree 或 staged 策略修改不会影响描述其自身提交的 Commit Message，而是在提交后生效。`styleHistoryLimit` 控制本地统计多少条近期 Commit Subject；设为 `0` 可关闭风格学习。历史 Subject 原文不会进入 Codex Prompt。
 
 项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 为 machine scope，`safeCodexCommit.model` 为 application scope，两者都不能被仓库策略覆盖。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
 
@@ -217,11 +219,14 @@ Extension Host 集成测试：
 npm run test:integration
 ```
 
-官方 VSIX 打包：
+生产 Bundle 与官方 VSIX 打包：
 
 ```bash
+npm run build
 npm run package
 ```
+
+Marketplace/Release 最终加载由固定版本 esbuild 生成的 `dist/extension.js`；源码模块和开发脚本不会进入 VSIX。
 
 GitHub Actions 还会验证：
 

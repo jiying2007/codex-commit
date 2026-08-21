@@ -30,7 +30,7 @@
     "onCommand:safeCodexCommit.regenerate",
     "onCommand:safeCodexCommit.checkEnvironment"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": false,
@@ -196,6 +196,13 @@
           "default": true,
           "description": "%config.autoInferScope%"
         },
+        "safeCodexCommit.styleHistoryLimit": {
+          "type": "number",
+          "default": 12,
+          "minimum": 0,
+          "maximum": 50,
+          "description": "%config.styleHistoryLimit%"
+        },
         "safeCodexCommit.extraInstructions": {
           "type": "string",
           "default": "",
@@ -212,21 +219,23 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js && node --check src/safe-contract.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && node test.js",
-    "test:unit": "node test.js",
-    "test:integration": "node ./test/integration/runTest.js",
+    "check": "node --check extension.js && node --check src/safe-contract.js && node --check src/commit-style.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && node test.js && node test/commit-style.test.js && npm run build",
+    "test:unit": "node test.js && node test/commit-style.test.js",
+    "test:integration": "npm run build && node ./test/integration/runTest.js",
     "test": "npm run test:unit",
-    "package": "vsce package --no-dependencies",
+    "package": "npm run build && vsce package --no-dependencies",
     "verify:lock": "node ./scripts/verify-lock.js",
     "verify:manifest": "node ./scripts/verify-manifest.js",
     "release:prepare": "node ./scripts/release.js prepare",
     "release:check": "node ./scripts/release.js check",
     "release:push": "node ./scripts/release.js push",
-    "ci": "npm run verify:lock && npm ci --ignore-scripts && npm run check && npm run test:integration && npm run package"
+    "ci": "npm run verify:lock && npm ci --ignore-scripts && npm run check && npm run test:integration && npm run package",
+    "build": "node scripts/build.js"
   },
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
-    "@vscode/vsce": "3.9.2"
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "0.28.2"
   },
   "repository": {
     "type": "git",
