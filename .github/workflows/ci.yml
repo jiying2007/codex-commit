@@ -119,9 +119,9 @@ jobs:
           grep -Fx 'extension/package.nls.json' /tmp/vsix-files.txt
           grep -Fx 'extension/package.nls.zh-cn.json' /tmp/vsix-files.txt
           grep -Fx 'extension/README.zh-CN.md' /tmp/vsix-files.txt
-          grep -Fx 'extension/src/safe-contract.js' /tmp/vsix-files.txt
+          grep -Fx 'extension/dist/extension.js' /tmp/vsix-files.txt
           grep -Fx 'extension/schemas/codex-commit.schema.json' /tmp/vsix-files.txt
-          if grep -E '^extension/(test|scripts|package-lock\.json|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
+          if grep -E '^extension/(extension\.js|src/|test|scripts|package-lock\.json|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
             echo 'VSIX contains development-only files' >&2
             exit 1
           fi
@@ -133,74 +133,3 @@ jobs:
             codex-commit-safe-*.vsix
             SHA256SUMS
           if-no-files-found: error
-
-# phase2-finalizer:start
-  phase2-finalize:
-    name: Finalize style intelligence branch
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/style-intelligence-bundle'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
-          cache: npm
-      - id: phase2
-        name: Check whether finalization is still needed
-        shell: bash
-        run: |
-          if test -f scripts/phase2-codemod.js; then
-            echo 'needed=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'needed=false' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Apply fail-closed codemod
-        if: steps.phase2.outputs.needed == 'true'
-        run: node scripts/phase2-codemod.js
-      - name: Lock pinned esbuild
-        if: steps.phase2.outputs.needed == 'true'
-        run: npm install --save-dev --save-exact esbuild@0.28.2 --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install locked dependencies
-        if: steps.phase2.outputs.needed == 'true'
-        run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run source, regression, manifest and bundle gates
-        if: steps.phase2.outputs.needed == 'true'
-        run: npm run check
-      - name: Build official VSIX
-        if: steps.phase2.outputs.needed == 'true'
-        run: npm run package
-      - name: Remove one-time codemod
-        if: steps.phase2.outputs.needed == 'true'
-        run: rm scripts/phase2-codemod.js
-      - name: Commit finalized non-workflow tree
-        if: steps.phase2.outputs.needed == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- \
-            extension.js \
-            package.json \
-            package-lock.json \
-            package.nls.json \
-            package.nls.zh-cn.json \
-            .codex-commit.example.json \
-            schemas/codex-commit.schema.json \
-            scripts/verify-manifest.js \
-            .vscodeignore \
-            .gitignore \
-            README.md \
-            README.zh-CN.md \
-            SECURITY.md \
-            scripts/phase2-codemod.js
-          git diff --cached --check
-          git commit -m 'feat: add repository style intelligence and bundled runtime'
-          git push origin HEAD:${{ github.head_ref }}
-# phase2-finalizer:end
