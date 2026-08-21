@@ -15,3 +15,4 @@ scripts/**
 extension.js
 src/**
 tsconfig*.json
+safe-core.lock.json
