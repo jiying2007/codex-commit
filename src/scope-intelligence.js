@@ -1,5 +1,63 @@
 'use strict';
 
+/** @typedef {Record<string, string[]>} ScopeHints */
+/**
+ * @typedef {Object} ScopeEvidenceGroups
+ * @property {string[]} scopeTokens
+ * @property {string[][]} customGroups
+ * @property {string[][]} builtInGroups
+ */
+/**
+ * @typedef {Object} ScopeHits
+ * @property {number} exactHits
+ * @property {number} customHits
+ * @property {number} builtInHits
+ */
+/**
+ * @typedef {Object} ScopeWeights
+ * @property {number} exact
+ * @property {number} custom
+ * @property {number} builtIn
+ */
+/**
+ * @typedef {Object} ScopeDiffSection
+ * @property {string} path
+ * @property {string[]} hunkContexts
+ * @property {string[]} addedLines
+ * @property {string[]} deletedLines
+ */
+/**
+ * @typedef {Object} ScopeSectionScore
+ * @property {number} path
+ * @property {number} context
+ * @property {number} added
+ * @property {number} deleted
+ * @property {number} total
+ * @property {boolean} strong
+ */
+/**
+ * @typedef {Object} ScopeAggregate
+ * @property {number} path
+ * @property {number} context
+ * @property {number} added
+ * @property {number} deleted
+ * @property {number} total
+ * @property {number} strongEvidence
+ * @property {number} winnerWeight
+ */
+/**
+ * @typedef {Object} ScopeDecision
+ * @property {string} scope
+ * @property {string} candidate
+ * @property {'none'|'low'|'medium'|'high'} confidence
+ * @property {number} topScore
+ * @property {number} margin
+ * @property {number} dominance
+ * @property {number} filesConsidered
+ * @property {number} changedWeight
+ */
+
+/** @type {Readonly<Record<string, readonly string[]>>} */
 const DEFAULT_SCOPE_HINTS = Object.freeze({
   bsp: ['bsp', 'board', 'boot', 'uboot', 'kernel', 'platform'],
   driver: ['driver', 'drivers', 'hal'],
@@ -15,6 +73,10 @@ const DEFAULT_SCOPE_HINTS = Object.freeze({
   system: ['system', 'daemon', 'init', 'supervisor']
 });
 
+/**
+ * @param {unknown} text
+ * @returns {string[]}
+ */
 function tokenizeScopeEvidence(text) {
   return String(text || '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -23,14 +85,24 @@ function tokenizeScopeEvidence(text) {
     .filter(Boolean);
 }
 
+/**
+ * @param {string[]} tokens
+ * @returns {string}
+ */
 function tokenGroupKey(tokens) {
   return tokens.join('\u0000');
 }
 
-function tokenGroups(values, excluded = new Set()) {
+/**
+ * @param {readonly string[]} [values]
+ * @param {Set<string>} [excluded]
+ * @returns {{groups: string[][], seen: Set<string>}}
+ */
+function tokenGroups(values = [], excluded = new Set()) {
+  /** @type {string[][]} */
   const groups = [];
   const seen = new Set(excluded);
-  for (const value of values || []) {
+  for (const value of values) {
     const tokens = [...new Set(tokenizeScopeEvidence(value))];
     if (!tokens.length) continue;
     const key = tokenGroupKey(tokens);
@@ -41,6 +113,11 @@ function tokenGroups(values, excluded = new Set()) {
   return { groups, seen };
 }
 
+/**
+ * @param {string} scope
+ * @param {ScopeHints} [customScopeHints]
+ * @returns {ScopeEvidenceGroups}
+ */
 function scopeEvidenceGroups(scope, customScopeHints = {}) {
   const scopeTokens = [...new Set(tokenizeScopeEvidence(scope))];
   const scopeKey = tokenGroupKey(scopeTokens);
@@ -49,15 +126,26 @@ function scopeEvidenceGroups(scope, customScopeHints = {}) {
   return { scopeTokens, customGroups: custom.groups, builtInGroups: builtIn.groups };
 }
 
+/**
+ * @param {Set<string>} tokens
+ * @param {string[]} group
+ * @returns {boolean}
+ */
 function tokensContainGroup(tokens, group) {
   return group.length > 0 && group.every(token => tokens.has(token));
 }
 
+/**
+ * @param {readonly string[]} lines
+ * @param {ScopeEvidenceGroups} groups
+ * @param {ScopeWeights} caps
+ * @returns {ScopeHits}
+ */
 function countLineEvidence(lines, groups, caps) {
   let exactHits = 0;
   let customHits = 0;
   let builtInHits = 0;
-  for (const line of lines || []) {
+  for (const line of lines) {
     const tokens = new Set(tokenizeScopeEvidence(line));
     if (!tokens.size) continue;
     if (exactHits < caps.exact && tokensContainGroup(tokens, groups.scopeTokens)) exactHits += 1;
@@ -67,6 +155,11 @@ function countLineEvidence(lines, groups, caps) {
   return { exactHits, customHits, builtInHits };
 }
 
+/**
+ * @param {ScopeHits} hits
+ * @param {ScopeWeights} weights
+ * @returns {number}
+ */
 function weightedLineScore(hits, weights) {
   return (
     hits.exactHits * weights.exact +
@@ -75,10 +168,18 @@ function weightedLineScore(hits, weights) {
   );
 }
 
+/**
+ * @param {unknown} diff
+ * @param {string[]} [stagedPaths]
+ * @returns {ScopeDiffSection[]}
+ */
 function parseScopeDiffSections(diff, stagedPaths = []) {
+  /** @type {ScopeDiffSection[]} */
   const sections = [];
+  /** @type {ScopeDiffSection | undefined} */
   let current;
 
+  /** @returns {ScopeDiffSection} */
   const startSection = () => ({
     path: stagedPaths[sections.length] || '',
     hunkContexts: [],
@@ -109,7 +210,7 @@ function parseScopeDiffSections(diff, stagedPaths = []) {
 
   while (sections.length < stagedPaths.length) {
     sections.push({
-      path: stagedPaths[sections.length],
+      path: stagedPaths[sections.length] || '',
       hunkContexts: [],
       addedLines: [],
       deletedLines: []
@@ -118,6 +219,12 @@ function parseScopeDiffSections(diff, stagedPaths = []) {
   return sections;
 }
 
+/**
+ * @param {ScopeDiffSection} section
+ * @param {string} scope
+ * @param {ScopeHints} customScopeHints
+ * @returns {ScopeSectionScore}
+ */
 function scoreScopeForSection(section, scope, customScopeHints) {
   const groups = scopeEvidenceGroups(scope, customScopeHints);
   const pathTokens = new Set(tokenizeScopeEvidence(section.path));
@@ -150,6 +257,7 @@ function scoreScopeForSection(section, scope, customScopeHints) {
   };
 }
 
+/** @returns {ScopeDecision} */
 function emptyScopeDecision() {
   return {
     scope: '',
@@ -163,19 +271,30 @@ function emptyScopeDecision() {
   };
 }
 
+/**
+ * @param {string[]} paths
+ * @param {string[]} scopes
+ * @param {unknown} [diff]
+ * @param {ScopeHints} [customScopeHints]
+ * @returns {ScopeDecision}
+ */
 function inferScopeDecision(paths, scopes, diff = '', customScopeHints = {}) {
   if (!paths.length || !scopes.length) return emptyScopeDecision();
 
   const sections = parseScopeDiffSections(diff, paths);
-  const aggregate = new Map(scopes.map(scope => [scope, {
-    path: 0,
-    context: 0,
-    added: 0,
-    deleted: 0,
-    total: 0,
-    strongEvidence: 0,
-    winnerWeight: 0
-  }]));
+  /** @type {Map<string, ScopeAggregate>} */
+  const aggregate = new Map();
+  for (const scope of scopes) {
+    aggregate.set(scope, {
+      path: 0,
+      context: 0,
+      added: 0,
+      deleted: 0,
+      total: 0,
+      strongEvidence: 0,
+      winnerWeight: 0
+    });
+  }
 
   let totalWeight = 0;
   for (const section of sections) {
@@ -195,7 +314,7 @@ function inferScopeDecision(paths, scopes, diff = '', customScopeHints = {}) {
       : '';
 
     for (const item of local) {
-      const target = aggregate.get(item.scope);
+      const target = /** @type {ScopeAggregate} */ (aggregate.get(item.scope));
       target.path += item.path * contributionScale;
       target.context += item.context * contributionScale;
       target.added += item.added * contributionScale;
@@ -216,6 +335,7 @@ function inferScopeDecision(paths, scopes, diff = '', customScopeHints = {}) {
 
   const margin = top.total - (second?.total || 0);
   const dominance = totalWeight > 0 ? top.winnerWeight / totalWeight : 0;
+  /** @type {'low'|'medium'|'high'} */
   let confidence = 'low';
   let preferred = '';
 
@@ -239,10 +359,21 @@ function inferScopeDecision(paths, scopes, diff = '', customScopeHints = {}) {
   };
 }
 
+/**
+ * @param {string[]} paths
+ * @param {string[]} scopes
+ * @param {unknown} [diff]
+ * @param {ScopeHints} [customScopeHints]
+ * @returns {string}
+ */
 function inferScope(paths, scopes, diff = '', customScopeHints = {}) {
   return inferScopeDecision(paths, scopes, diff, customScopeHints).scope;
 }
 
+/**
+ * @param {ScopeDecision} decision
+ * @returns {string}
+ */
 function summarizeScopeDecision(decision) {
   const preferred = decision.scope || '<none>';
   const candidate = decision.candidate || '<none>';
