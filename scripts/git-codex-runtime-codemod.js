@@ -47,36 +47,11 @@ const runnerMarker = `} = createProcessRunner(ui);\n`;
 const runnerInjection = `} = createProcessRunner(ui);\n\nconst {\n  PROJECT_RULES_FILE,\n  git,\n  getRepositoryStyleGuidance,\n  normalizeFsPath,\n  repositoryFromCommandContext,\n  getStagedDiff,\n  getStagedPaths,\n  hasUnmergedEntries,\n  getIndexFingerprint,\n  getHeadOid,\n  getRepositorySnapshot,\n  repositorySnapshotsEqual,\n  readProjectRulesAtHead\n} = createGitRepository({ runProcess, runProcessBuffer, ui });\n\nconst {\n  buildPrompt,\n  outputSchema,\n  parseCodexJsonl,\n  validateStructuredResult,\n  formatCommitMessage,\n  resolveCodexExecutable,\n  probeCodexCapabilities,\n  buildCodexArgs,\n  runCodex,\n  isCliCompatibilityError,\n  missingHelpFlags\n} = createCodexRuntime({ runProcess, runPreparedProcess, ui });\n`;
 source = replaceOnce(source, runnerMarker, runnerInjection, 'process runner factory marker');
 
-source = replaceRegexOnce(
-  source,
-  /async function git\([\s\S]*?\n}\n\nasync function getGitApi/,
-  'async function getGitApi',
-  'legacy git/style block'
-);
-source = replaceRegexOnce(
-  source,
-  /function normalizeFsPath\([\s\S]*?\n}\n\nasync function getRepositories/,
-  'async function getRepositories',
-  'legacy normalizeFsPath block'
-);
-source = replaceRegexOnce(
-  source,
-  /function repositoryFromCommandContext\([\s\S]*?\n}\n\nasync function chooseRepository/,
-  'async function chooseRepository',
-  'legacy repository context block'
-);
-source = replaceRegexOnce(
-  source,
-  /async function getStagedDiff\([\s\S]*?\n}\n\nasync function getEffectiveOptions/,
-  'async function getEffectiveOptions',
-  'legacy staged/snapshot/policy I/O block'
-);
-source = replaceRegexOnce(
-  source,
-  /function buildPrompt\([\s\S]*?\n}\n\nasync function setCommitInput/,
-  'async function setCommitInput',
-  'legacy Codex runtime block'
-);
+source = replaceRegexOnce(source, /async function git\([\s\S]*?\n}\n\nasync function getGitApi/, 'async function getGitApi', 'legacy git/style block');
+source = replaceRegexOnce(source, /function normalizeFsPath\([\s\S]*?\n}\n\nasync function getRepositories/, 'async function getRepositories', 'legacy normalizeFsPath block');
+source = replaceRegexOnce(source, /function repositoryFromCommandContext\([\s\S]*?\n}\n\nasync function chooseRepository/, 'async function chooseRepository', 'legacy repository context block');
+source = replaceRegexOnce(source, /async function getStagedDiff\([\s\S]*?\n}\n\nasync function getEffectiveOptions/, 'async function getEffectiveOptions', 'legacy staged/snapshot/policy I/O block');
+source = replaceRegexOnce(source, /function buildPrompt\([\s\S]*?\n}\n\nasync function setCommitInput/, 'async function setCommitInput', 'legacy Codex runtime block');
 
 for (const forbidden of [
   'function buildPrompt(',
@@ -131,10 +106,25 @@ fs.writeFileSync(tsconfigPath, `${JSON.stringify(tsconfig, null, 2)}\n`);
 let verifier = fs.readFileSync(manifestVerifierPath, 'utf8');
 const verifierMarker = `if (pkg.scripts?.['check:types'] !== 'tsc -p tsconfig.pure.json') fail('check:types must run the strict pure-module TypeScript gate.');\n`;
 if (!verifier.includes(verifierMarker)) fail('manifest verifier marker missing');
-verifier = verifier.replace(
-  verifierMarker,
-  `${verifierMarker}\nconst typecheckConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.pure.json'), 'utf8'));\nfor (const requiredModule of [\n  'src/commit-style.js',\n  'src/scope-intelligence.js',\n  'src/policy-validation.js',\n  'src/process-runner.js',\n  'src/git-repository.js',\n  'src/codex-runtime.js'\n]) {\n  if (!(typecheckConfig.include || []).includes(requiredModule)) {\n    fail(\`strict TypeScript gate must include ${requiredModule}\`);\n  }\n}\n`
-);
+const typecheckGuard = [
+  verifierMarker.trimEnd(),
+  '',
+  "const typecheckConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.pure.json'), 'utf8'));",
+  'for (const requiredModule of [',
+  "  'src/commit-style.js',",
+  "  'src/scope-intelligence.js',",
+  "  'src/policy-validation.js',",
+  "  'src/process-runner.js',",
+  "  'src/git-repository.js',",
+  "  'src/codex-runtime.js'",
+  ']) {',
+  '  if (!(typecheckConfig.include || []).includes(requiredModule)) {',
+  "    fail('strict TypeScript gate must include ' + requiredModule);",
+  '  }',
+  '}',
+  ''
+].join('\n');
+verifier = verifier.replace(verifierMarker, typecheckGuard);
 fs.writeFileSync(manifestVerifierPath, verifier);
 
 console.log('git repository and Codex runtime extraction applied successfully');
