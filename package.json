@@ -219,7 +219,7 @@
     }
   },
   "scripts": {
-    "check": "node --check extension.js && node --check src/safe-contract.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && node test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && npm run build",
+    "check": "npm run check:types && node --check extension.js && node --check src/safe-contract.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && node test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && npm run build",
     "test:unit": "node test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js",
     "test:integration": "npm run build && node ./test/integration/runTest.js",
     "test": "npm run test:unit",
@@ -230,12 +230,14 @@
     "release:check": "node ./scripts/release.js check",
     "release:push": "node ./scripts/release.js push",
     "ci": "npm run verify:lock && npm ci --ignore-scripts && npm run check && npm run test:integration && npm run package",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "check:types": "tsc -p tsconfig.pure.json"
   },
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.9.2",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
   },
   "repository": {
     "type": "git",
