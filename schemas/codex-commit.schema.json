@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jiying2007/codex-commit/blob/main/schemas/codex-commit.schema.json",
+  "title": "Codex Commit Safe project policy",
+  "description": "Repository-owned policy for Codex Commit Safe. Only the copy committed in HEAD is applied.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "language": {
+      "type": "string",
+      "enum": ["zh-CN", "en"],
+      "description": "Language used for generated commit descriptions and bodies."
+    },
+    "subjectMaxLength": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 120,
+      "description": "Preferred maximum length of the generated commit subject."
+    },
+    "maxDiffBytes": {
+      "type": "integer",
+      "minimum": 4096,
+      "maximum": 2097152,
+      "description": "Maximum staged diff size accepted for one generation request."
+    },
+    "maxBodyChars": {
+      "type": "integer",
+      "minimum": 200,
+      "maximum": 10000,
+      "description": "Maximum total generated commit message length."
+    },
+    "scopes": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,31}$"
+      },
+      "description": "Preferred Conventional Commit scopes. Duplicate entries are unnecessary."
+    },
+    "scopeHints": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,31}$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "maxItems": 32,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "[A-Za-z0-9]"
+        }
+      },
+      "description": "Static semantic aliases used by local scope inference. Every key must also appear in the effective scopes list."
+    },
+    "scopePolicy": {
+      "type": "string",
+      "enum": ["flexible", "strict"],
+      "description": "Whether generated non-empty scopes may extend beyond the configured scopes list."
+    },
+    "autoInferScope": {
+      "type": "boolean",
+      "description": "Enable local staged-path and changed-diff scope inference."
+    },
+    "extraInstructions": {
+      "type": "string",
+      "maxLength": 4000,
+      "description": "Additional team style guidance. It cannot override Codex Commit Safe safety constraints."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 300,
+      "description": "Maximum Codex generation time in seconds."
+    }
+  }
+}
