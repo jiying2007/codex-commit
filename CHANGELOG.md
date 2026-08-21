@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Pin `.codex-commit.json` to the captured HEAD and expose its fingerprint in the generation policy context.
+- Use the versioned Codex Safe argv/compatibility contract shared with Review and PR.
+- Show whether the latest Codex Review Safe receipt matches the exact staged HEAD/index snapshot.
+- Add offline quality fixtures for strict-scope and result-validation behavior.
+
 ## 1.3.1
 
 Scope Intelligence maintenance release.

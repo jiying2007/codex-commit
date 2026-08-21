@@ -1,0 +1,14 @@
+[
+  {
+    "name": "strict configured scope",
+    "result": { "type": "fix", "scope": "power", "description": "修复低功耗恢复", "body": [] },
+    "options": { "scopePolicy": "strict", "scopes": ["power", "camera"], "subjectMaxLength": 72, "maxBodyChars": 2000 },
+    "expectedMessage": "fix(power): 修复低功耗恢复"
+  },
+  {
+    "name": "reject invented strict scope",
+    "result": { "type": "fix", "scope": "other", "description": "修复低功耗恢复", "body": [] },
+    "options": { "scopePolicy": "strict", "scopes": ["power", "camera"], "subjectMaxLength": 72, "maxBodyChars": 2000 },
+    "expectedError": true
+  }
+]

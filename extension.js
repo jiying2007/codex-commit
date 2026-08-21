@@ -6,12 +6,22 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const {
+  REQUIRED_CODEX_TOP_LEVEL_FLAGS,
+  REQUIRED_CODEX_EXEC_FLAGS,
+  buildSafeCodexArgs,
+  missingHelpFlags,
+  isCliCompatibilityError,
+  fingerprintPolicy,
+  validateReviewReceipt
+} = require('./src/safe-contract');
 
 const VALID_TYPES = new Set([
   'feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore'
 ]);
 
 const PROJECT_RULES_FILE = '.codex-commit.json';
+const REVIEW_EXTENSION_ID = 'jiying2007.codex-review-safe';
 const PROJECT_RULE_KEYS = new Set([
   'language',
   'subjectMaxLength',
@@ -527,6 +537,22 @@ async function getGitApi() {
   return exports?.getAPI?.(1);
 }
 
+async function getReviewEvidence(repoRoot, snapshot) {
+  try {
+    const extension = vscode.extensions.getExtension(REVIEW_EXTENSION_ID);
+    if (!extension) return { status: 'unavailable', receipt: null };
+    const api = extension.isActive ? extension.exports : await extension.activate();
+    if (typeof api?.getReviewReceiptStatus !== 'function') return { status: 'unsupported', receipt: null };
+    const result = await api.getReviewReceiptStatus(repoRoot, snapshot);
+    const receipt = result?.receipt ? validateReviewReceipt(result.receipt) : null;
+    if (result?.receipt && !receipt) return { status: 'invalid', receipt: null };
+    if (!['current', 'stale', 'unavailable'].includes(result?.status)) return { status: 'invalid', receipt: null };
+    return { status: result.status, receipt };
+  } catch {
+    return { status: 'error', receipt: null };
+  }
+}
+
 function normalizeFsPath(p) {
   const resolved = path.resolve(p);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
@@ -905,26 +931,33 @@ function summarizeScopeDecision(decision) {
   return `scope inference: preferred=${preferred}, candidate=${candidate}, confidence=${decision.confidence}, score=${decision.topScore}, margin=${decision.margin}, dominance=${decision.dominance}, files=${decision.filesConsidered}`;
 }
 
-function readProjectRules(repoRoot) {
-  const rulesPath = path.join(repoRoot, PROJECT_RULES_FILE);
-  if (!fs.existsSync(rulesPath)) return {};
+async function readProjectRulesAtHead(repoRoot, headOid, token) {
+  if (headOid === '<unborn>') return { rules: {}, source: 'unborn-default', fingerprint: '<none>' };
 
-  let stat;
-  try {
-    stat = fs.lstatSync(rulesPath);
-  } catch (error) {
-    throw new Error(ui(`无法读取 ${PROJECT_RULES_FILE}: ${error.message}`, `Failed to read ${PROJECT_RULES_FILE}: ${error.message}`));
+  const { stdout: listed } = await git(['ls-tree', '-z', headOid, '--', PROJECT_RULES_FILE], repoRoot, token);
+  const entry = listed.split('\0').find(Boolean);
+  if (!entry) return { rules: {}, source: 'head-default', fingerprint: '<none>' };
+  const header = entry.slice(0, entry.indexOf('\t'));
+  const mode = header.split(/\s+/)[0];
+  if (mode !== '100644' && mode !== '100755') {
+    throw new Error(ui(`${PROJECT_RULES_FILE} 在 HEAD 中必须是普通文件。`, `${PROJECT_RULES_FILE} in HEAD must be a regular file.`));
   }
 
-  if (stat.isSymbolicLink()) throw new Error(ui(`${PROJECT_RULES_FILE} 不允许是符号链接。`, `${PROJECT_RULES_FILE} must not be a symbolic link.`));
-  if (!stat.isFile()) throw new Error(ui(`${PROJECT_RULES_FILE} 必须是普通文件。`, `${PROJECT_RULES_FILE} must be a regular file.`));
-  if (stat.size > 64 * 1024) throw new Error(ui(`${PROJECT_RULES_FILE} 最大 64 KiB。`, `${PROJECT_RULES_FILE} cannot exceed 64 KiB.`));
+  let stdout;
+  try {
+    ({ stdout } = await git(['show', `${headOid}:${PROJECT_RULES_FILE}`], repoRoot, token));
+  } catch (error) {
+    throw new Error(ui(`无法读取 HEAD 中的 ${PROJECT_RULES_FILE}: ${error.message}`, `Failed to read ${PROJECT_RULES_FILE} from HEAD: ${error.message}`));
+  }
+  if (Buffer.byteLength(stdout, 'utf8') > 64 * 1024) {
+    throw new Error(ui(`HEAD 中的 ${PROJECT_RULES_FILE} 最大 64 KiB。`, `${PROJECT_RULES_FILE} in HEAD cannot exceed 64 KiB.`));
+  }
 
   let parsed;
   try {
-    parsed = JSON.parse(fs.readFileSync(rulesPath, 'utf8'));
+    parsed = JSON.parse(stdout);
   } catch (error) {
-    throw new Error(ui(`无法解析 ${PROJECT_RULES_FILE}: ${error.message}`, `Failed to parse ${PROJECT_RULES_FILE}: ${error.message}`));
+    throw new Error(ui(`无法解析 HEAD 中的 ${PROJECT_RULES_FILE}: ${error.message}`, `Failed to parse ${PROJECT_RULES_FILE} in HEAD: ${error.message}`));
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -938,12 +971,17 @@ function readProjectRules(repoRoot) {
       `${PROJECT_RULES_FILE} contains unsupported fields: ${unknown.join(', ')}. Project rules cannot configure executables, models, environment variables, or working directories.`
     ));
   }
-  return parsed;
+  return {
+    rules: parsed,
+    source: 'head-policy',
+    fingerprint: crypto.createHash('sha256').update(stdout, 'utf8').digest('hex')
+  };
 }
 
-function getEffectiveOptions(repoRoot) {
+async function getEffectiveOptions(repoRoot, headOid, token) {
   const config = vscode.workspace.getConfiguration('safeCodexCommit', vscode.Uri.file(repoRoot));
-  const project = readProjectRules(repoRoot);
+  const policy = await readProjectRulesAtHead(repoRoot, headOid, token);
+  const project = policy.rules;
   const codexPath = String(getUserOnlySetting(config, 'codexPath', 'codex') || 'codex').trim();
   const model = String(getUserOnlySetting(config, 'model', '') || '').trim();
 
@@ -986,7 +1024,7 @@ function getEffectiveOptions(repoRoot) {
     throw new Error(ui('合并后的 extraInstructions 最长 4000 字符。', 'Combined extraInstructions cannot exceed 4000 characters.'));
   }
 
-  return {
+  const options = {
     codexPath,
     model,
     language,
@@ -998,8 +1036,24 @@ function getEffectiveOptions(repoRoot) {
     scopePolicy,
     autoInferScope: typeof project.autoInferScope === 'boolean' ? project.autoInferScope : Boolean(config.get('autoInferScope', true)),
     extraInstructions,
-    timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds')
+    timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds'),
+    policySource: policy.source,
+    projectPolicyFingerprint: policy.fingerprint
   };
+  options.policyFingerprint = fingerprintPolicy({
+    language: options.language,
+    maxDiffBytes: options.maxDiffBytes,
+    subjectMaxLength: options.subjectMaxLength,
+    maxBodyChars: options.maxBodyChars,
+    scopes: options.scopes,
+    scopeHints: options.scopeHints,
+    scopePolicy: options.scopePolicy,
+    autoInferScope: options.autoInferScope,
+    extraInstructions: options.extraInstructions,
+    timeoutSeconds: options.timeoutSeconds,
+    projectPolicyFingerprint: options.projectPolicyFingerprint
+  });
+  return options;
 }
 
 function buildPrompt(options, preferredScope, previousMessage) {
@@ -1208,23 +1262,6 @@ async function resolveCodexExecutable(codexPath) {
   throw error;
 }
 
-const REQUIRED_CODEX_TOP_LEVEL_FLAGS = ['--ask-for-approval'];
-const REQUIRED_CODEX_EXEC_FLAGS = [
-  '--json',
-  '--ephemeral',
-  '--skip-git-repo-check',
-  '--ignore-user-config',
-  '--ignore-rules',
-  '--sandbox',
-  '--output-schema',
-  '--config'
-];
-
-function missingHelpFlags(helpText, requiredFlags) {
-  const text = String(helpText || '');
-  return requiredFlags.filter(flag => !text.includes(flag));
-}
-
 async function probeCodexCapabilities(executable, { requireModel = false } = {}) {
   let topLevel;
   let execHelp;
@@ -1273,45 +1310,8 @@ async function withTemporaryDirectory(fn) {
   }
 }
 
-function isCliCompatibilityError(error) {
-  const text = `${error?.stderr || ''}\n${error?.stdout || ''}\n${error?.message || ''}`.toLowerCase();
-  return (
-    text.includes('unexpected argument') ||
-    text.includes('unknown argument') ||
-    text.includes('unrecognized option') ||
-    text.includes('unknown option') ||
-    text.includes('unknown feature') ||
-    text.includes('unknown config key') ||
-    text.includes('unrecognized config key')
-  );
-}
-
 function buildCodexArgs(schemaPath, model) {
-  const args = [
-    '--ask-for-approval', 'never',
-    'exec',
-    '--json',
-    '--ephemeral',
-    '--skip-git-repo-check',
-    '--ignore-user-config',
-    '--ignore-rules',
-    '--sandbox', 'read-only',
-    '--output-schema', schemaPath,
-    '--config', 'web_search="disabled"',
-    '--config', 'features.shell_tool=false',
-    '--config', 'features.unified_exec=false',
-    '--config', 'features.shell_snapshot=false',
-    '--config', 'features.apps=false',
-    '--config', 'features.multi_agent=false',
-    '--config', 'features.remote_plugin=false',
-    '--config', 'features.hooks=false',
-    '--config', 'features.goals=false',
-    '--config', 'features.memories=false',
-    '--config', 'features.skill_mcp_dependency_install=false'
-  ];
-  if (model) args.push('--model', model);
-  args.push('-');
-  return args;
+  return buildSafeCodexArgs(schemaPath, model);
 }
 
 async function runCodex(diff, options, preferredScope, previousMessage, token) {
@@ -1430,7 +1430,8 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
   if (!repositoryInfo) return;
 
   const repoRoot = repositoryInfo.root;
-  const options = getEffectiveOptions(repoRoot);
+  const policyHeadOid = await getHeadOid(repoRoot);
+  const options = await getEffectiveOptions(repoRoot, policyHeadOid);
   const { key, state } = beginGeneration(repoRoot);
   log(`${regenerate ? 'regenerate' : 'generate'} started`);
 
@@ -1457,6 +1458,14 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
           }
 
           const snapshotBefore = await getRepositorySnapshot(repoRoot, token);
+          if (snapshotBefore.headOid !== policyHeadOid) {
+            const error = new Error(ui(
+              '读取 Commit 策略后 Git HEAD 已变化，请重新生成。',
+              'Git HEAD changed after the Commit policy was read. Generate the Commit Message again.'
+            ));
+            error.code = 'EREPOSITORYCHANGED';
+            throw error;
+          }
 
           if (
             extensionMode === vscode.ExtensionMode.Test &&
@@ -1561,9 +1570,15 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
     const message = formatCommitMessage(generationResult.structured, options);
     await setCommitInput(repositoryInfo, message);
 
-    log('generation completed successfully');
+    const reviewEvidence = await getReviewEvidence(repoRoot, currentRepositorySnapshot);
+    log(`generation completed successfully: reviewEvidence=${reviewEvidence.status}`);
     const firstLine = message.split(/\r?\n/, 1)[0];
-    vscode.window.setStatusBarMessage(`$(check) Codex Commit Safe: ${firstLine}`, 5000);
+    const reviewLabel = reviewEvidence.status === 'current'
+      ? ui('审查凭据匹配', 'review receipt matches')
+      : reviewEvidence.status === 'stale'
+        ? ui('审查凭据已过期', 'review receipt stale')
+        : ui('无匹配审查凭据', 'no matching review receipt');
+    vscode.window.setStatusBarMessage(`$(check) Codex Commit Safe: ${firstLine} · ${reviewLabel}`, 5000);
   } finally {
     finishGeneration(key, state.id);
   }
@@ -1573,7 +1588,8 @@ async function checkEnvironment() {
   assertTrustedWorkspace();
   const repositories = await getRepositories();
   const repoRoot = repositories[0]?.root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-  const options = getEffectiveOptions(repoRoot);
+  const headOid = await getHeadOid(repoRoot);
+  const options = await getEffectiveOptions(repoRoot, headOid);
   const resolved = await resolveCodexExecutable(options.codexPath);
 
   let gitVersion = '';
@@ -1681,7 +1697,8 @@ module.exports = {
     inferScopeDecision,
     inferScope,
     summarizeScopeDecision,
-    readProjectRules,
+    readProjectRulesAtHead,
+    getEffectiveOptions,
     buildPrompt,
     buildCodexArgs,
     outputSchema,
@@ -1697,6 +1714,7 @@ module.exports = {
     getIndexFingerprint,
     getHeadOid,
     getRepositorySnapshot,
-    repositorySnapshotsEqual
+    repositorySnapshotsEqual,
+    getReviewEvidence
   }
 };

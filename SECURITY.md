@@ -21,7 +21,7 @@ Organization-managed Codex requirements, managed hooks, MDM settings, or cloud p
 
 ## Project configuration boundary
 
-`.codex-commit.json` is treated as untrusted repository content. It is rejected when it is a symlink, not a regular file, too large, malformed, or contains unknown fields.
+`.codex-commit.json` is treated as untrusted repository content and is read only from the exact captured HEAD. Working-tree and staged policy edits take effect after commit. The policy is rejected when its HEAD entry is a symlink/non-regular file, too large, malformed, or contains unknown fields.
 
 Project configuration cannot set the Codex executable, model, environment variables, working directory, or arbitrary commands. The executable path and model are application-scoped User Settings and are checked again at runtime.
 
@@ -35,6 +35,8 @@ The generated message must describe the exact staged state that was analyzed. Th
 - a SHA-256 fingerprint of the raw `git ls-files --stage -z` index bytes.
 
 The snapshot is checked before and after input collection and again before writing the generated message. If HEAD or the Git index changes, the result is discarded. A newer request also supersedes any older in-flight generation for the same repository.
+
+When Codex Review Safe is installed, Commit may query its read-only Extension API for a versioned receipt matching the exact HEAD/index snapshot. The receipt changes only status text; missing, stale, invalid, or unavailable evidence never authorizes an automatic commit.
 
 ## Multi-repository workspaces
 

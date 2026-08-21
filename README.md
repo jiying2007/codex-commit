@@ -17,6 +17,8 @@ Generate safe, structured Conventional Commit messages from **staged Git changes
 - Codex Structured Output with local schema validation
 - Regeneration, cancellation, timeout, multi-repository workspaces, and project-level rules
 - HEAD + raw Git index snapshot protection against stale results and TOCTOU races
+- HEAD-pinned `.codex-commit.json` policy with a stable policy fingerprint; staged/unstaged policy edits take effect only after commit
+- Optional Codex Review Safe receipt status for the exact staged HEAD/index snapshot; missing or stale review evidence never commits automatically
 - Windows `.exe` / `.cmd` / `.bat`, Linux, and macOS execution paths covered by CI
 - Never automatically commits, pushes, or modifies project source files
 
@@ -173,6 +175,8 @@ A repository may include `.codex-commit.json`:
   "timeoutSeconds": 90
 }
 ```
+
+Only the copy committed in **HEAD** is used. Working-tree or staged policy edits do not affect the message that describes their own commit; they take effect after commit.
 
 Project rules cannot configure the Codex executable, model, environment variables, working directory, or arbitrary commands. `safeCodexCommit.codexPath` and `safeCodexCommit.model` are application-scoped User Settings. When `autoInferScope` is enabled, scope preference combines staged-path evidence with changed-diff semantics; generic filenames alone do not force a domain scope, and low-confidence/conflicting evidence is left to Codex.
 

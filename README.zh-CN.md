@@ -17,6 +17,8 @@
 - Codex Structured Output + 本地 Schema 校验
 - 支持重新生成、取消、超时、多仓库和项目规则
 - HEAD + Git 原始 index snapshot 防止 stale result 和 TOCTOU
+- `.codex-commit.json` 固定读取 HEAD 并记录策略指纹；staged/unstaged 策略修改在提交后才生效
+- 可选显示精确 HEAD/index staged 快照对应的 Codex Review Safe 凭据状态；缺失或过期凭据不会触发自动提交
 - CI 覆盖 Windows `.exe/.cmd/.bat`、Linux、macOS
 - 永远不会自动 commit、push 或修改项目源码
 
@@ -174,6 +176,8 @@ Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
   "timeoutSeconds": 90
 }
 ```
+
+插件只使用 **HEAD** 中已提交的配置。working-tree 或 staged 策略修改不会影响描述其自身提交的 Commit Message，而是在提交后生效。
 
 项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 和 `safeCodexCommit.model` 只能通过应用级 User Settings 配置。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
 

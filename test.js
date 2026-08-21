@@ -22,6 +22,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { __test } = require('./extension.js');
 const pkg = require('./package.json');
+const qualityCases = require('./test/quality-cases.json');
 
 function spawnGit(args, cwd) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -193,31 +194,57 @@ function spawnGit(args, cwd) {
     { type: 'fix', scope: 'other', description: '修复低功耗恢复', body: [] },
     { scopePolicy: 'strict', scopes: ['power', 'camera'] }
   ));
+  for (const item of qualityCases) {
+    if (item.expectedError) {
+      assert.throws(() => __test.validateStructuredResult(item.result, item.options), undefined, item.name);
+    } else {
+      const validated = __test.validateStructuredResult(item.result, item.options);
+      assert.strictEqual(__test.formatCommitMessage(validated, item.options), item.expectedMessage, item.name);
+    }
+  }
 
-  // Project rules whitelist, malformed file and symlink protection.
+  // HEAD-pinned project rules ignore working-tree edits and reject malformed or symlink entries.
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-commit-test-'));
   try {
+    spawnGit(['init'], temp);
+    spawnGit(['config', 'user.email', 'test@example.invalid'], temp);
+    spawnGit(['config', 'user.name', 'Codex Commit Safe Test'], temp);
     fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({
       language: 'zh-CN',
       scopes: ['wifi'],
       scopeHints: { wifi: ['wowl'] },
       scopePolicy: 'strict'
     }));
-    assert.deepStrictEqual(__test.readProjectRules(temp).scopes, ['wifi']);
-    assert.deepStrictEqual(__test.readProjectRules(temp).scopeHints, { wifi: ['wowl'] });
-    assert.strictEqual(__test.readProjectRules(temp).scopePolicy, 'strict');
+    spawnGit(['add', '.codex-commit.json'], temp);
+    spawnGit(['commit', '-m', 'test: add policy'], temp);
+    let head = spawnGit(['rev-parse', 'HEAD'], temp).trim();
+    const committed = await __test.readProjectRulesAtHead(temp, head);
+    assert.deepStrictEqual(committed.rules.scopes, ['wifi']);
+    assert.deepStrictEqual(committed.rules.scopeHints, { wifi: ['wowl'] });
+    assert.strictEqual(committed.rules.scopePolicy, 'strict');
+    assert.strictEqual(committed.source, 'head-policy');
 
     fs.writeFileSync(path.join(temp, '.codex-commit.json'), JSON.stringify({ codexPath: '/tmp/evil' }));
-    assert.throws(() => __test.readProjectRules(temp));
+    assert.deepStrictEqual((await __test.readProjectRulesAtHead(temp, head)).rules.scopes, ['wifi']);
+    spawnGit(['add', '.codex-commit.json'], temp);
+    spawnGit(['commit', '-m', 'test: add invalid policy'], temp);
+    head = spawnGit(['rev-parse', 'HEAD'], temp).trim();
+    await assert.rejects(() => __test.readProjectRulesAtHead(temp, head));
 
     fs.writeFileSync(path.join(temp, '.codex-commit.json'), '{bad json');
-    assert.throws(() => __test.readProjectRules(temp));
+    spawnGit(['add', '.codex-commit.json'], temp);
+    spawnGit(['commit', '-m', 'test: add malformed policy'], temp);
+    head = spawnGit(['rev-parse', 'HEAD'], temp).trim();
+    await assert.rejects(() => __test.readProjectRulesAtHead(temp, head));
 
     if (process.platform !== 'win32') {
       fs.rmSync(path.join(temp, '.codex-commit.json'));
       fs.writeFileSync(path.join(temp, 'outside.json'), '{}');
       fs.symlinkSync(path.join(temp, 'outside.json'), path.join(temp, '.codex-commit.json'));
-      assert.throws(() => __test.readProjectRules(temp));
+      spawnGit(['add', '.codex-commit.json'], temp);
+      spawnGit(['commit', '-m', 'test: add symlink policy'], temp);
+      head = spawnGit(['rev-parse', 'HEAD'], temp).trim();
+      await assert.rejects(() => __test.readProjectRulesAtHead(temp, head));
     }
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
@@ -229,6 +256,13 @@ function spawnGit(args, cwd) {
   assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: unknown feature key features.apps' }), true);
   assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: unknown config key web_search' }), true);
   assert.strictEqual(__test.isCliCompatibilityError({ stderr: 'error: invalid value for model' }), false);
+
+  const receiptSnapshot={headOid:'1'.repeat(40),indexFingerprint:'2'.repeat(64)};
+  const validReceipt={schemaVersion:1,kind:'codex-review-safe',...receiptSnapshot,diffFingerprint:'3'.repeat(64),policyFingerprint:'<none>',stagedFileCount:1,qualityVerdict:'no_findings',readinessVerdict:'needs_evidence',mechanicalGate:'not_run',createdAt:'2026-08-21T00:00:00.000Z'};
+  fakeVscode.extensions.getExtension=()=>({isActive:true,exports:{getReviewReceiptStatus:()=>({status:'current',receipt:validReceipt})}});
+  assert.strictEqual((await __test.getReviewEvidence('/repo',receiptSnapshot)).status,'current');
+  fakeVscode.extensions.getExtension=()=>undefined;
+  assert.strictEqual((await __test.getReviewEvidence('/repo',receiptSnapshot)).status,'unavailable');
 
   // Explicit Codex paths fail closed when --version fails, and the environment
   // capability probe verifies the required top-level and exec options without
