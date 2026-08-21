@@ -6,6 +6,7 @@ const CONVENTIONAL_TYPES = new Set([
 
 const SUBJECT_LIMIT_MAX = 50;
 const SUBJECT_LENGTH_MAX = 180;
+const STYLE_SAMPLE_MIN = 3;
 
 function clampHistoryLimit(value, fallback = 12) {
   const n = Number(value);
@@ -17,7 +18,7 @@ function normalizeSubject(value) {
   if (typeof value !== 'string') return '';
   const subject = value.trim();
   if (!subject || subject.length > SUBJECT_LENGTH_MAX) return '';
-  if (/[\0-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(subject)) return '';
+  if (/[\r\n\0-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(subject)) return '';
   return subject;
 }
 
@@ -51,6 +52,7 @@ function summarizeRepositoryStyle(subjects) {
   const normalized = (subjects || []).map(normalizeSubject).filter(Boolean).slice(0, SUBJECT_LIMIT_MAX);
   const summary = {
     sampleSize: normalized.length,
+    conventionalSampleSize: 0,
     conventionalRatio: 0,
     scopedRatio: 0,
     terminalPeriodRatio: 0,
@@ -83,6 +85,7 @@ function summarizeRepositoryStyle(subjects) {
     }
   }
 
+  summary.conventionalSampleSize = conventional;
   summary.conventionalRatio = ratio(conventional, normalized.length);
   summary.scopedRatio = ratio(scoped, conventional);
   summary.terminalPeriodRatio = ratio(terminalPeriod, normalized.length);
@@ -96,13 +99,15 @@ function percent(value) {
 }
 
 function buildRepositoryStyleGuidance(summary) {
-  if (!summary || summary.sampleSize < 3) return [];
+  if (!summary || summary.sampleSize < STYLE_SAMPLE_MIN) return [];
 
   const guidance = [];
-  if (summary.scopedRatio >= 0.7) {
-    guidance.push(`Recent Conventional Commit subjects usually include a scope (${percent(summary.scopedRatio)}% of matching subjects).`);
-  } else if (summary.scopedRatio <= 0.3) {
-    guidance.push(`Recent Conventional Commit subjects usually omit a scope (${percent(summary.scopedRatio)}% include one).`);
+  if (summary.conventionalSampleSize >= STYLE_SAMPLE_MIN) {
+    if (summary.scopedRatio >= 0.7) {
+      guidance.push(`Recent Conventional Commit subjects usually include a scope (${percent(summary.scopedRatio)}% of matching subjects).`);
+    } else if (summary.scopedRatio <= 0.3) {
+      guidance.push(`Recent Conventional Commit subjects usually omit a scope (${percent(summary.scopedRatio)}% include one).`);
+    }
   }
 
   if (summary.terminalPeriodRatio <= 0.2) {
@@ -111,9 +116,9 @@ function buildRepositoryStyleGuidance(summary) {
     guidance.push(`Recent subjects usually use terminal punctuation (${percent(summary.terminalPeriodRatio)}% end with punctuation).`);
   }
 
-  if (summary.englishCaseSampleSize >= 3 && summary.englishLowercaseRatio >= 0.7) {
+  if (summary.englishCaseSampleSize >= STYLE_SAMPLE_MIN && summary.englishLowercaseRatio >= 0.7) {
     guidance.push(`Recent English descriptions usually start lowercase (${percent(summary.englishLowercaseRatio)}% of sampled descriptions).`);
-  } else if (summary.englishCaseSampleSize >= 3 && summary.englishLowercaseRatio <= 0.3) {
+  } else if (summary.englishCaseSampleSize >= STYLE_SAMPLE_MIN && summary.englishLowercaseRatio <= 0.3) {
     guidance.push(`Recent English descriptions usually start uppercase (${percent(1 - summary.englishLowercaseRatio)}% of sampled descriptions).`);
   }
 
@@ -128,6 +133,7 @@ module.exports = {
   CONVENTIONAL_TYPES,
   SUBJECT_LIMIT_MAX,
   SUBJECT_LENGTH_MAX,
+  STYLE_SAMPLE_MIN,
   clampHistoryLimit,
   normalizeSubject,
   parseCommitSubjects,
