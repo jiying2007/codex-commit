@@ -30,6 +30,7 @@ const SAFE_CODEX_CONFIG_OVERRIDES = Object.freeze([
   'features.skill_mcp_dependency_install=false'
 ]);
 
+/** @param {string} schemaPath @param {string} [model] @returns {string[]} */
 function buildSafeCodexArgs(schemaPath, model = '') {
   const args = [
     '--ask-for-approval', 'never',
@@ -48,11 +49,13 @@ function buildSafeCodexArgs(schemaPath, model = '') {
   return args;
 }
 
+/** @param {unknown} helpText @param {readonly string[]} requiredFlags @returns {string[]} */
 function missingHelpFlags(helpText, requiredFlags) {
   const text = String(helpText || '');
   return requiredFlags.filter(flag => !text.includes(flag));
 }
 
+/** @param {any} error @returns {boolean} */
 function isCliCompatibilityError(error) {
   const text = `${error?.stderr || ''}\n${error?.stdout || ''}\n${error?.message || ''}`.toLowerCase();
   return [
@@ -66,6 +69,7 @@ function isCliCompatibilityError(error) {
   ].some(fragment => text.includes(fragment));
 }
 
+/** @param {any} value @returns {any} */
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === 'object') {
@@ -74,10 +78,12 @@ function canonicalize(value) {
   return value;
 }
 
+/** @param {any} value @returns {string} */
 function fingerprintPolicy(value) {
   return crypto.createHash('sha256').update(JSON.stringify(canonicalize(value)), 'utf8').digest('hex');
 }
 
+/** @param {any} value @returns {Readonly<Record<string, any>> | null} */
 function validateReviewReceipt(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (value.schemaVersion !== REVIEW_RECEIPT_SCHEMA_VERSION || value.kind !== 'codex-review-safe') return null;
