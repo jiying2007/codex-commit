@@ -1,6 +1,6 @@
 'use strict';
 
-const safeCoreModule = require('./safe-core-loader');
+const safeCoreModule = require('./codex-safe-core/codex-cli');
 
 const VALID_TYPES = new Set([
   'feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore'

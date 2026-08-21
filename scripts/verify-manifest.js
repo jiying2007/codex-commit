@@ -58,7 +58,7 @@ for (const requiredModule of [
   'src/policy-validation.js',
   'src/process-runner.js',
   'src/git-repository.js',
-  'src/safe-core-loader.d.ts',
+  'src/codex-safe-core/codex-cli.d.ts',
   'src/commit-runtime.js'
 ]) {
   if (!(typecheckConfig.include || []).includes(requiredModule)) {
