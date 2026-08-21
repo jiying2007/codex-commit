@@ -121,7 +121,7 @@ jobs:
           grep -Fx 'extension/README.zh-CN.md' /tmp/vsix-files.txt
           grep -Fx 'extension/dist/extension.js' /tmp/vsix-files.txt
           grep -Fx 'extension/schemas/codex-commit.schema.json' /tmp/vsix-files.txt
-          if grep -E '^extension/(extension\.js|src/|test|scripts|package-lock\.json|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
+          if grep -E '^extension/(extension\.js|src/|test|scripts|package-lock\.json|tsconfig[^/]*\.json|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
             echo 'VSIX contains development-only files' >&2
             exit 1
           fi
@@ -133,3 +133,63 @@ jobs:
             codex-commit-safe-*.vsix
             SHA256SUMS
           if-no-files-found: error
+
+# pure-typecheck-finalizer:start
+  pure-typecheck-finalize:
+    name: Finalize pure module typecheck
+    if: github.event_name == 'pull_request' && github.head_ref == 'build/typecheck-pure-modules'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - id: typecheck
+        name: Check whether typecheck finalization is needed
+        shell: bash
+        run: |
+          if test -f scripts/typecheck-codemod.js; then
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Add typecheck scripts
+        if: steps.typecheck.outputs.needed == 'true'
+        run: node scripts/typecheck-codemod.js
+      - name: Lock TypeScript 7
+        if: steps.typecheck.outputs.needed == 'true'
+        run: npm install --save-dev --save-exact typescript@7.0.2 --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install locked dependencies
+        if: steps.typecheck.outputs.needed == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run strict pure-module typecheck
+        if: steps.typecheck.outputs.needed == 'true'
+        run: npm run check:types
+      - name: Run complete quality gates
+        if: steps.typecheck.outputs.needed == 'true'
+        run: npm run check
+      - name: Build official VSIX
+        if: steps.typecheck.outputs.needed == 'true'
+        run: npm run package
+      - name: Remove one-time codemod
+        if: steps.typecheck.outputs.needed == 'true'
+        run: rm scripts/typecheck-codemod.js
+      - name: Commit finalized typecheck gate
+        if: steps.typecheck.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- package.json package-lock.json scripts/typecheck-codemod.js
+          git diff --cached --check
+          git commit -m 'build(types): enforce strict pure module checks'
+          git push origin HEAD:${{ github.head_ref }}
+# pure-typecheck-finalizer:end
