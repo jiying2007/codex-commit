@@ -133,3 +133,60 @@ jobs:
             codex-commit-safe-*.vsix
             SHA256SUMS
           if-no-files-found: error
+
+# process-runner-finalizer:start
+  process-runner-finalize:
+    name: Finalize process runner extraction
+    if: github.event_name == 'pull_request' && github.head_ref == 'refactor/process-runner'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - id: extraction
+        name: Check whether extraction is still needed
+        shell: bash
+        run: |
+          if test -f scripts/process-runner-codemod.js; then
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Pin Node type definitions
+        if: steps.extraction.outputs.needed == 'true'
+        run: npm install --save-dev --save-exact @types/node@26.2.0 --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install locked dependencies
+        if: steps.extraction.outputs.needed == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply fail-closed extraction
+        if: steps.extraction.outputs.needed == 'true'
+        run: node scripts/process-runner-codemod.js
+      - name: Run strict Node typecheck and complete quality gates
+        if: steps.extraction.outputs.needed == 'true'
+        run: npm run check
+      - name: Build official VSIX
+        if: steps.extraction.outputs.needed == 'true'
+        run: npm run package
+      - name: Remove one-time codemod
+        if: steps.extraction.outputs.needed == 'true'
+        run: rm scripts/process-runner-codemod.js
+      - name: Commit behavior-equivalent extraction
+        if: steps.extraction.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- extension.js package.json package-lock.json tsconfig.pure.json scripts/process-runner-codemod.js
+          git diff --cached --check
+          git commit -m 'refactor(process): route extension through process runner'
+          git push origin HEAD:${{ github.head_ref }}
+# process-runner-finalizer:end
