@@ -111,6 +111,7 @@ const typecheckGuard = [
   '',
   "const typecheckConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.pure.json'), 'utf8'));",
   'for (const requiredModule of [',
+  "  'src/safe-contract.js',",
   "  'src/commit-style.js',",
   "  'src/scope-intelligence.js',",
   "  'src/policy-validation.js',",
