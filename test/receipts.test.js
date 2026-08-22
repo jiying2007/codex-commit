@@ -6,10 +6,10 @@ const {
   COMMIT_RECEIPT_SCHEMA_VERSION,
   SAFE_CORE_VERSION,
   SAFE_CONTRACT_VERSION,
-  POLICY_SCHEMA_VERSION,
   COMMIT_PROMPT_CONTRACT_VERSION,
   validateCommitReceipt
 } = require('../src/codex-safe-core/safe-contract');
+const { POLICY_SCHEMA_VERSION } = require('../src/codex-safe-core/policy');
 const {
   RECEIPT_STORAGE_KEY,
   fingerprintCommitMessage,
