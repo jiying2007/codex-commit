@@ -16,6 +16,7 @@ jobs:
   verify:
     name: Safe Core integrity
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,5 +28,7 @@ jobs:
         run: |
           node --check src/codex-safe-core/safe-contract.js
           node --check src/codex-safe-core/codex-cli.js
-      - name: Verify canonical Safe Core integrity
+      - name: Verify vendored Safe Core integrity
         run: node scripts/safe-core.js verify
+      - name: Verify canonical upstream lock
+        run: node scripts/safe-core.js upstream
