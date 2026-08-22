@@ -20,7 +20,7 @@ A release is valid only when:
 - `package.json` and `package-lock.json` name/version/devDependencies/engines agree;
 - the Core path is a `160000` Git submodule gitlink pointing to `jiying2007/codex-safe-core`;
 - the Core v2 contract/schema checks pass;
-- unit, regression, provenance and type checks pass;
+- unit, regression, provenance, syntax and module-boundary checks pass;
 - latest VS Code Extension Host tests pass on Linux, Windows and macOS;
 - minimum VS Code `1.90.0` passes;
 - official VSIX package-boundary verification passes;
@@ -116,7 +116,7 @@ The final job creates:
 
 Both are uploaded as workflow artifacts and GitHub Release assets. GitHub build-provenance attestations are generated for the VSIX and checksum file using a full-SHA-pinned `actions/attest-build-provenance` action.
 
-Do not rebuild a different binary for another distribution channel. Marketplace publication, when enabled, must reuse the already validated VSIX.
+Do not rebuild a different binary for another distribution channel. Marketplace publication downloads the immutable GitHub Release `VSIX` plus `SHA256SUMS`, verifies the checksum and package boundary, then publishes that exact validated VSIX.
 
 ## Failure policy
 
