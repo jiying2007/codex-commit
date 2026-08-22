@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2.1.0
+
+- Pin Codex Safe Core 2.1 as the canonical policy/process/Git/context/contract runtime.
+- Split Commit UI, repository selection, policy merge, and Review-evidence adapters out of the extension entry; remove the extension.__test compatibility surface.
+- Fix Commit Receipt diff fingerprint generation to await the async Core fingerprint helper.
+- Remove redundant product process-runner proxy/tests and the stale TypeScript checkJs dual-track; validate the JavaScript runtime through syntax, production-module, Extension Host, bundle and VSIX gates.
+
 ## 2.0.0
 
 - Breaking: hard-switch to Codex Safe Core v2 as the only shared runtime/safety source through a commit-pinned Git submodule; remove copied vendoring, sync locks, compatibility shims, and legacy policy paths.
