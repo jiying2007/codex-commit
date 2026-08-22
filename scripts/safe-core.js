@@ -20,8 +20,8 @@ function verify() {
   if (lock.schemaVersion !== 1 || manifest.schemaVersion !== 1) fail('Unsupported Safe Core schema version.');
   if (lock.safeCoreVersion !== manifest.safeCoreVersion) fail('Safe Core version differs between lock and manifest.');
   if (!sameSource(lock.source, manifest.source)) fail('Safe Core source differs between lock and manifest.');
-  if (lock.source.repository !== 'jiying2007/codex-commit' || lock.source.ref !== 'main' || lock.source.path !== 'src/codex-safe-core') {
-    fail('Safe Core canonical source must be jiying2007/codex-commit:main/src/codex-safe-core.');
+  if (lock.source.repository !== 'jiying2007/codex-safe-core' || lock.source.ref !== 'main' || lock.source.path !== 'src') {
+    fail('Safe Core canonical source must be jiying2007/codex-safe-core:main/src.');
   }
   if (sha256(manifestBytes) !== lock.manifestSha256) fail('Safe Core manifest hash does not match safe-core.lock.json.');
   const names = Object.keys(manifest.files || {}).sort();
