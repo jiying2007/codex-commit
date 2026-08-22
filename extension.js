@@ -3,10 +3,13 @@
 const vscode = require('vscode');
 const path = require('path');
 const {
+  COMMIT_RECEIPT_SCHEMA_VERSION,
   missingHelpFlags,
   isCliCompatibilityError,
+  fingerprint,
   fingerprintPolicy,
-  validateReviewReceipt
+  validateReviewReceipt,
+  validateCommitReceipt
 } = require('./src/codex-safe-core/safe-contract');
 const {
   tokenizeScopeEvidence,
@@ -20,10 +23,12 @@ const { createPolicyValidators } = require('./src/policy-validation');
 const { createProcessRunner } = require('./src/process-runner');
 const { createGitRepository } = require('./src/git-repository');
 const { createCommitRuntime } = require('./src/commit-runtime');
+const { createCommitReceiptStore, fingerprintCommitMessage } = require('./src/receipts');
 
 const REVIEW_EXTENSION_ID = 'jiying2007.codex-review-safe';
 let outputChannel;
 let extensionMode = vscode.ExtensionMode?.Production ?? 1;
+let commitReceiptStore;
 
 const activeGenerations = new Map();
 let nextGenerationId = 1;
@@ -68,6 +73,7 @@ const {
   getHeadOid,
   getRepositorySnapshot,
   repositorySnapshotsEqual,
+  fingerprintDiff,
   readProjectRulesAtHead
 } = createGitRepository({ runProcess, runProcessBuffer, ui });
 
@@ -126,6 +132,13 @@ async function getReviewEvidence(repoRoot, snapshot) {
   } catch {
     return { status: 'error', receipt: null };
   }
+}
+
+async function getCommitEvidenceForRange(repoRoot, baseRef, headRef = 'HEAD', token) {
+  if (!commitReceiptStore) {
+    return { schemaVersion: COMMIT_RECEIPT_SCHEMA_VERSION, kind: 'codex-commit-range-evidence', totalCommits: 0, generatedCommits: 0, reviewedGeneratedCommits: 0, matches: [] };
+  }
+  return commitReceiptStore.getEvidenceForRange(repoRoot, baseRef, headRef, token);
 }
 
 async function getRepositories() {
@@ -208,11 +221,7 @@ async function getEffectiveOptions(repoRoot, headOid, token) {
     configuredScopes,
     'safeCodexCommit.scopeHints'
   );
-  // A repository may intentionally replace the configured scope list. User/workspace
-  // hints for scopes outside that effective project list are irrelevant, not errors.
   const userScopeHints = filterScopeHints(configuredScopeHints, scopes);
-  // Repository-owned hints, however, must be internally consistent with the
-  // repository's effective scopes and therefore remain fail-closed.
   const projectScopeHints = validateScopeHints(project.scopeHints, scopes, `${PROJECT_RULES_FILE}.scopeHints`);
   const scopeHints = mergeScopeHints(userScopeHints, projectScopeHints);
   const scopePolicy = validateScopePolicy(project.scopePolicy ?? config.get('scopePolicy', 'flexible'));
@@ -443,8 +452,9 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
             repositoryStyleGuidance,
             token
           );
+          const diffFingerprint = await fingerprintDiff(diff);
 
-          return { structured, repositorySnapshot: snapshotAfter };
+          return { structured, repositorySnapshot: snapshotAfter, diffFingerprint };
         } finally {
           linked.dispose();
         }
@@ -473,9 +483,32 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
     }
 
     const message = formatCommitMessage(generationResult.structured, options);
+    const reviewEvidence = await getReviewEvidence(repoRoot, currentRepositorySnapshot);
     await setCommitInput(repositoryInfo, message);
 
-    const reviewEvidence = await getReviewEvidence(repoRoot, currentRepositorySnapshot);
+    const receiptSnapshot = await getRepositorySnapshot(repoRoot);
+    if (repositorySnapshotsEqual(receiptSnapshot, currentRepositorySnapshot) && commitReceiptStore) {
+      const receipt = validateCommitReceipt({
+        schemaVersion: COMMIT_RECEIPT_SCHEMA_VERSION,
+        kind: 'codex-commit-safe',
+        headOid: currentRepositorySnapshot.headOid,
+        indexFingerprint: currentRepositorySnapshot.indexFingerprint,
+        diffFingerprint: generationResult.diffFingerprint,
+        messageFingerprint: fingerprintCommitMessage(message),
+        policyFingerprint: options.policyFingerprint || '<none>',
+        reviewReceiptFingerprint: reviewEvidence.status === 'current' && reviewEvidence.receipt
+          ? fingerprint(reviewEvidence.receipt)
+          : '<none>',
+        model: options.model || 'cli-default',
+        createdAt: new Date().toISOString(),
+        commitOid: '<pending>'
+      });
+      if (!receipt) throw new Error('Generated Commit receipt failed v2 validation.');
+      await commitReceiptStore.persistPending(repoRoot, receipt);
+    } else {
+      log('commit receipt not persisted: repository changed after generation');
+    }
+
     log(`generation completed successfully: reviewEvidence=${reviewEvidence.status}`);
     const firstLine = message.split(/\r?\n/, 1)[0];
     const reviewLabel = reviewEvidence.status === 'current'
@@ -527,6 +560,8 @@ function friendlyError(error) {
 function activate(context) {
   extensionMode = context.extensionMode;
   outputChannel = vscode.window.createOutputChannel('Codex Commit Safe');
+  commitReceiptStore = createCommitReceiptStore(context.globalState, { git, normalizeFsPath, fingerprintDiff });
+  commitReceiptStore.restore();
   context.subscriptions.push(outputChannel);
 
   context.subscriptions.push(
@@ -581,6 +616,7 @@ function deactivate() {
 module.exports = {
   activate,
   deactivate,
+  getCommitEvidenceForRange,
   __test: {
     clampNumber,
     validateScopes,
@@ -621,6 +657,7 @@ module.exports = {
     getRepositorySnapshot,
     repositorySnapshotsEqual,
     getRepositoryStyleGuidance,
-    getReviewEvidence
+    getReviewEvidence,
+    getCommitEvidenceForRange
   }
 };
