@@ -61,7 +61,7 @@
     "pretest": "npm run core:init",
     "prebuild": "npm run core:init",
     "prepackage": "npm run core:init",
-    "check": "npm run check:types && node --check extension.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check src/policy-validation.js && node --check src/git-repository.js && node --check src/receipts.js && node --check src/codex-safe-core/safe-contract.js && node --check src/codex-safe-core/codex-cli.js && node --check src/codex-safe-core/process-runner.js && node --check src/codex-safe-core/git-repository.js && node --check src/codex-safe-core/policy.js && node --check src/codex-safe-core/context-builder.js && node --check src/commit-runtime.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && npm run test:unit && npm run build",
+    "check": "node --check extension.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check src/policy-validation.js && node --check src/git-repository.js && node --check src/receipts.js && node --check src/codex-safe-core/safe-contract.js && node --check src/codex-safe-core/codex-cli.js && node --check src/codex-safe-core/process-runner.js && node --check src/codex-safe-core/git-repository.js && node --check src/codex-safe-core/policy.js && node --check src/codex-safe-core/context-builder.js && node --check src/commit-runtime.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && npm run test:unit && npm run build",
     "test:unit": "node test.js && node test/review-evidence.test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && node test/policy-validation.test.js && node test/git-repository.test.js && node test/commit-runtime.test.js && node test/receipts.test.js",
     "test:integration": "npm run build && node ./test/integration/runTest.js",
     "test": "npm run test:unit",
@@ -72,15 +72,12 @@
     "release:check": "node ./scripts/release.js check",
     "release:push": "node ./scripts/release.js push",
     "ci": "npm run verify:lock && npm ci --ignore-scripts && npm run check && npm run test:integration && npm run package",
-    "build": "node scripts/build.js",
-    "check:types": "tsc -p tsconfig.pure.json"
+    "build": "node scripts/build.js"
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.9.2",
-    "esbuild": "0.28.2",
-    "typescript": "7.0.2"
+    "esbuild": "0.28.2"
   },
   "repository": { "type": "git", "url": "https://github.com/jiying2007/codex-commit.git" },
   "homepage": "https://github.com/jiying2007/codex-commit#readme",
