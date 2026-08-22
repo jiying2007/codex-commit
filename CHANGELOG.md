@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.0.0
+
 - Breaking: hard-switch to Codex Safe Core v2 as the only shared runtime/safety source through a commit-pinned Git submodule; remove copied vendoring, sync locks, compatibility shims, and legacy policy paths.
 - Replace `.codex-commit.json` with the unified `.codex-safe.json` schema v2 `commit` section; v1 policy is intentionally unsupported.
 - Route model input through Safe Core Semantic Context Budget while preserving the complete staged diff for fingerprints/provenance; enforce a fixed 8 MiB raw staged-diff safety ceiling.
