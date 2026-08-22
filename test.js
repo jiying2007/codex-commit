@@ -67,10 +67,26 @@ for (const ownedFunction of ['getEffectiveOptions', 'getRepositories', 'chooseRe
   assert.doesNotMatch(extensionSource, new RegExp(`(?:async\\s+)?function\\s+${ownedFunction}\\s*\\(`), `${ownedFunction} must stay outside extension.js`);
 }
 assert.match(extensionSource, /await fingerprintDiff\(diff\)/, 'Commit receipt diff fingerprint must await the async Core fingerprint helper');
+assert.match(extensionSource, /executionMeta\?\.codexVersion/, 'Commit Receipt must persist actual Codex execution provenance');
 
 const releaseWorkflow = fs.readFileSync(path.join(__dirname, '.github', 'workflows', 'release.yml'), 'utf8');
 assert.match(releaseWorkflow, /workflow_dispatch/);
-assert.match(releaseWorkflow, /Attest VSIX and checksum provenance/);
+assert.match(releaseWorkflow, /Attest immutable release provenance/);
+assert.match(releaseWorkflow, /SBOM\.spdx\.json/);
+assert.match(releaseWorkflow, /immutable assets will not be overwritten/);
+assert.doesNotMatch(releaseWorkflow, /--clobber/);
+assert.doesNotMatch(releaseWorkflow, /tags:\s*\[/);
 assert.strictEqual(pkg.main, './dist/extension.js');
+assert.strictEqual(pkg.displayName, '%extension.displayName%');
+for (const command of pkg.contributes.commands) assert.strictEqual(command.category, '%extension.displayName%');
+assert.strictEqual(pkg.contributes.configuration.title, '%extension.displayName%');
+assert.strictEqual(pkg.capabilities?.untrustedWorkspaces?.supported, false);
+assert.strictEqual(pkg.capabilities?.virtualWorkspaces?.supported, false);
+const scmGenerate = (pkg.contributes?.menus?.['scm/title'] || []).find(item => item.command === 'safeCodexCommit.generate');
+assert.match(String(scmGenerate?.when || ''), /isWorkspaceTrusted/, 'SCM generation command must require workspace trust');
+for (const command of ['safeCodexCommit.generate', 'safeCodexCommit.regenerate', 'safeCodexCommit.checkEnvironment']) {
+  const item = (pkg.contributes?.menus?.commandPalette || []).find(entry => entry.command === command);
+  assert.match(String(item?.when || ''), /isWorkspaceTrusted/, `${command} must require workspace trust`);
+}
 
 console.log(`Codex Commit Safe ${pkg.version} product-boundary tests passed.`);

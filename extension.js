@@ -247,11 +247,14 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
         reviewReceiptFingerprint: reviewEvidence.status === 'current' && reviewEvidence.receipt
           ? fingerprint(reviewEvidence.receipt)
           : '<none>',
-        model: options.model || 'cli-default',
+        model: generationResult.structured.executionMeta?.resolvedModel || options.model || 'cli-default',
+        requestedModel: generationResult.structured.executionMeta?.requestedModel || options.model || '',
+        resolvedModel: generationResult.structured.executionMeta?.resolvedModel || options.model || '',
+        codexVersion: generationResult.structured.executionMeta?.codexVersion || 'unknown',
         createdAt: new Date().toISOString(),
         commitOid: '<pending>'
       });
-      if (!receipt) throw new Error('Generated Commit receipt failed v2 validation.');
+      if (!receipt) throw new Error('Generated Commit Receipt v4 failed validation.');
       await commitReceiptStore.persistPending(repoRoot, receipt);
     } else {
       log('commit receipt not persisted: repository changed after generation');

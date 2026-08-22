@@ -86,6 +86,7 @@ const runtime = createCommitRuntime({
   ].join('\n');
   const result = await runtime.runCodex(diff, options, 'core', '', ['Recent subjects usually omit terminal punctuation (0% end with punctuation).']);
   assert.deepStrictEqual(result, structured);
+  assert.deepStrictEqual(result.executionMeta, { codexVersion: 'codex-cli 1.2.3', requestedModel: '', resolvedModel: '' });
   const execution = calls.find(call => call.args.includes('exec') && call.args.includes('--output-schema'));
   assert(execution, 'Safe Core structured execution was not invoked');
   assert.match(execution.stdinText, /--- STAGED GIT CONTEXT START ---/);

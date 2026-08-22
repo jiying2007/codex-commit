@@ -4,8 +4,12 @@ const assert = require('assert');
 const crypto = require('crypto');
 const {
   COMMIT_RECEIPT_SCHEMA_VERSION,
+  SAFE_CORE_VERSION,
+  SAFE_CONTRACT_VERSION,
+  COMMIT_PROMPT_CONTRACT_VERSION,
   validateCommitReceipt
 } = require('../src/codex-safe-core/safe-contract');
+const { POLICY_SCHEMA_VERSION } = require('../src/codex-safe-core/policy');
 const {
   RECEIPT_STORAGE_KEY,
   fingerprintCommitMessage,
@@ -27,8 +31,8 @@ function createState() {
 }
 
 (async () => {
-  assert.strictEqual(COMMIT_RECEIPT_SCHEMA_VERSION, 3);
-  assert.strictEqual(RECEIPT_STORAGE_KEY, 'safeCodexCommit.receipts.v3');
+  assert.strictEqual(COMMIT_RECEIPT_SCHEMA_VERSION, 4);
+  assert.strictEqual(RECEIPT_STORAGE_KEY, 'safeCodexCommit.receipts.v4');
 
   const state = createState();
   let committedMessage = `${message}\n`;
@@ -61,11 +65,15 @@ function createState() {
     commitOid: '<pending>'
   });
   assert(pending);
-  assert.strictEqual(validateCommitReceipt({ ...pending, schemaVersion: 2 }), null, 'Commit Receipt v2 must stay invalid');
+  assert.strictEqual(pending.safeCoreVersion, SAFE_CORE_VERSION);
+  assert.strictEqual(pending.safeContractVersion, SAFE_CONTRACT_VERSION);
+  assert.strictEqual(pending.policySchemaVersion, POLICY_SCHEMA_VERSION);
+  assert.strictEqual(pending.promptContractVersion, COMMIT_PROMPT_CONTRACT_VERSION);
+  assert.strictEqual(validateCommitReceipt({ ...pending, schemaVersion: 3 }), null, 'Commit Receipt v3 must stay invalid');
   await store.persistPending('/repo', pending);
 
   const evidence = await store.getEvidenceForRange('/repo', 'main', 'HEAD');
-  assert.strictEqual(evidence.schemaVersion, 3);
+  assert.strictEqual(evidence.schemaVersion, 4);
   assert.strictEqual(evidence.totalCommits, 1);
   assert.strictEqual(evidence.generatedCommits, 1);
   assert.strictEqual(evidence.reviewedGeneratedCommits, 1);
@@ -76,7 +84,7 @@ function createState() {
   const edited = await store.getEvidenceForRange('/repo', 'main', 'HEAD');
   assert.strictEqual(edited.generatedCommits, 0, 'edited commit message must invalidate provenance');
 
-  console.log('Commit Receipt v3 provenance tests passed.');
+  console.log('Commit Receipt v4 provenance tests passed.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

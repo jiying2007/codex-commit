@@ -260,7 +260,16 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
         schemaFileName: 'commit-schema.json',
         token
       });
-      return validateStructuredResult(result.parsed, options);
+      const structured = validateStructuredResult(result.parsed, options);
+      Object.defineProperty(structured, 'executionMeta', {
+        value: Object.freeze({
+          codexVersion: result.resolved?.version || 'unknown',
+          requestedModel: options.model || '',
+          resolvedModel: options.model || ''
+        }),
+        enumerable: false, configurable: false, writable: false
+      });
+      return structured;
     } catch (error) {
       const err = /** @type {any} */ (error);
       if (err?.code === 'ECODEXVERSION') {

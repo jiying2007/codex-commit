@@ -8,9 +8,9 @@ Codex Commit Safe 是 **Codex Safe Git Workflow** 产品族的 Commit 阶段：
 
 ```text
 Codex Review Safe
-      ↓ Review Receipt v3
+      ↓ Review Receipt v4
 Codex Commit Safe
-      ↓ Commit Receipt v3
+      ↓ Commit Receipt v4
 Codex PR Safe
       ↓ 可验证 PR provenance
 ```
@@ -28,7 +28,7 @@ Codex PR Safe
 - Structured Output 必须经过本地 schema 和语义校验后才写入 SCM 输入框。
 - HEAD 或 Git 原始 index 变化时丢弃 stale result。
 - 如果存在匹配的 Codex Review Safe Receipt，则纳入 Commit provenance。
-- 生成与 HEAD、index、完整 diff、最终 message、policy、Review evidence 绑定的 pending Commit Receipt v3。
+- 生成与 HEAD、index、完整 diff、最终 message、policy、Review evidence 绑定的 pending Commit Receipt v4。
 - 向 Codex PR Safe 暴露经过重新验证的 Commit range evidence。
 
 ## 明确不会做的事

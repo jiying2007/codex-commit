@@ -3,7 +3,7 @@
 const Module = require('module');
 const originalLoad = Module._load;
 const receipt = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   kind: 'codex-review',
   subject: {
     type: 'git-index',
@@ -40,16 +40,18 @@ const { getReviewEvidence } = require('../src/review-evidence');
     indexFingerprint: receipt.subject.indexFingerprint
   });
   assert.strictEqual(current.status, 'current');
-  assert.strictEqual(current.receipt.schemaVersion, 3);
+  assert.strictEqual(current.receipt.schemaVersion, 4);
+  assert.strictEqual(current.receipt.safeCoreVersion, 4);
+  assert.strictEqual(current.receipt.promptContractVersion, 1);
   assert.strictEqual(current.receipt.kind, 'codex-review');
   assert.strictEqual(current.receipt.subject.type, 'git-index');
 
-  assert.strictEqual(validateReviewReceipt({ ...receipt, schemaVersion: 2 }), null, 'Policy family v3 must not accept Review Receipt v2');
+  assert.strictEqual(validateReviewReceipt({ ...receipt, schemaVersion: 3 }), null, 'Family v4 must not accept Review Receipt v3');
   assert.strictEqual(validateReviewReceipt({ ...receipt, kind: 'codex-review-safe' }), null, 'legacy Review Receipt kind must stay invalid');
 
   extension = undefined;
   assert.strictEqual((await getReviewEvidence('/repo', {})).status, 'unavailable');
-  console.log('Review Receipt v3 evidence adapter tests passed.');
+  console.log('Review Receipt v4 evidence adapter tests passed.');
 })().catch(error => {
   console.error(error);
   process.exit(1);

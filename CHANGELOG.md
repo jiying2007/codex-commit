@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 4.0.0
+
+### Changed
+
+- Hard-switch to Safe Core 4.0.0 and Commit/Review Receipt v4; old Receipt storage is not migrated.
+- Record actual Codex CLI execution provenance plus requested/resolved model identity in Commit Receipt v4.
+- Align manifest localization with Review/PR and add immutable VSIX + SPDX SBOM + SHA256 + provenance release governance.
+
 ## 3.0.0
 
 ### Changed

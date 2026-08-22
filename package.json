@@ -1,8 +1,8 @@
 {
   "name": "codex-commit-safe",
-  "displayName": "Codex Commit Safe",
+  "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -46,19 +46,19 @@
       {
         "command": "safeCodexCommit.generate",
         "title": "%command.generate.title%",
-        "category": "Codex Commit Safe",
+        "category": "%extension.displayName%",
         "icon": "$(sparkle)"
       },
       {
         "command": "safeCodexCommit.regenerate",
         "title": "%command.regenerate.title%",
-        "category": "Codex Commit Safe",
+        "category": "%extension.displayName%",
         "icon": "$(redo)"
       },
       {
         "command": "safeCodexCommit.checkEnvironment",
         "title": "%command.checkEnvironment.title%",
-        "category": "Codex Commit Safe",
+        "category": "%extension.displayName%",
         "icon": "$(check)"
       }
     ],
@@ -92,7 +92,7 @@
       }
     ],
     "configuration": {
-      "title": "Codex Commit Safe",
+      "title": "%extension.displayName%",
       "properties": {
         "safeCodexCommit.codexPath": {
           "type": "string",
@@ -240,7 +240,7 @@
     "release:prepare": "node ./scripts/release.js prepare",
     "release:check": "node ./scripts/release.js check",
     "release:push": "node ./scripts/release.js push",
-    "ci": "npm run verify:lock && npm ci --ignore-scripts && npm run check && npm run test:integration && npm run package",
+    "ci": "npm run verify:lock && npm ci --ignore-scripts --no-audit --no-fund && npm run check && npm run test:integration && npm run package",
     "build": "node scripts/build.js"
   },
   "devDependencies": {
