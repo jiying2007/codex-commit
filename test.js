@@ -80,5 +80,13 @@ assert.strictEqual(pkg.main, './dist/extension.js');
 assert.strictEqual(pkg.displayName, '%extension.displayName%');
 for (const command of pkg.contributes.commands) assert.strictEqual(command.category, '%extension.displayName%');
 assert.strictEqual(pkg.contributes.configuration.title, '%extension.displayName%');
+assert.strictEqual(pkg.capabilities?.untrustedWorkspaces?.supported, false);
+assert.strictEqual(pkg.capabilities?.virtualWorkspaces?.supported, false);
+const scmGenerate = (pkg.contributes?.menus?.['scm/title'] || []).find(item => item.command === 'safeCodexCommit.generate');
+assert.match(String(scmGenerate?.when || ''), /isWorkspaceTrusted/, 'SCM generation command must require workspace trust');
+for (const command of ['safeCodexCommit.generate', 'safeCodexCommit.regenerate', 'safeCodexCommit.checkEnvironment']) {
+  const item = (pkg.contributes?.menus?.commandPalette || []).find(entry => entry.command === command);
+  assert.match(String(item?.when || ''), /isWorkspaceTrusted/, `${command} must require workspace trust`);
+}
 
 console.log(`Codex Commit Safe ${pkg.version} product-boundary tests passed.`);
