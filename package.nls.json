@@ -1,4 +1,5 @@
 {
+  "extension.displayName": "Codex Commit Safe",
   "extension.description": "Generate safe, structured Conventional Commit messages from staged Git changes using the local Codex CLI.",
   "command.generate.title": "Generate Commit Message",
   "command.regenerate.title": "Regenerate Commit Message",
