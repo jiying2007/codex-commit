@@ -1,65 +1,146 @@
 # Security
 
-## Repository style history
+Codex Commit Safe follows the **Codex Safe Core v2** contract. Security-sensitive shared primitives are owned by the pinned `codex-safe-core` submodule; the extension repository owns Commit-specific domain logic only.
 
-When repository style learning is enabled, Codex Commit Safe reads a bounded number of commit subjects from the exact HEAD snapshot. Those subjects are parsed locally and reduced to fixed numeric/boolean style statistics. Raw historical commit text is never appended to the Codex prompt, logged, or included in the review receipt. Set `styleHistoryLimit` to `0` to disable this feature.
+## Trust boundaries
 
-## Data flow
+### 1. Workspace
 
-Codex Commit Safe sends only the staged Git diff and commit-generation instructions to the configured Codex service. The repository itself is never used as the Codex working directory.
+- Restricted Mode is unsupported.
+- Virtual workspaces are unsupported.
+- Commands enforce Workspace Trust at runtime; UI `when` clauses are not the security boundary.
+- Multi-repository ambiguity fails closed instead of writing to an uncertain SCM input box.
 
-The staged diff still leaves the local machine for model inference. Use the extension only where your organization’s source-code and data policy permits it.
+### 2. Git repository
 
-## Execution boundary
+Repository state is represented by:
 
-For commit generation, the extension:
+- exact HEAD OID, including unborn HEAD; and
+- SHA-256 of raw `git ls-files --stage -z` index bytes.
 
-- runs Codex from a temporary directory;
-- requests a read-only sandbox and no approvals;
-- ignores user Codex config and project execution rules for the request;
-- disables unnecessary shell, execution, web, app, agent, hook, goal, memory, and plugin-related features where supported;
-- validates Structured Output locally before writing it to VS Code SCM;
-- never automatically commits, pushes, or modifies project source files.
+Snapshots are rechecked around input collection, after model execution and before the result/receipt is accepted. Stale results are discarded.
 
-Organization-managed Codex requirements, managed hooks, MDM settings, or cloud policy have higher precedence and may still apply. The extension does not attempt to bypass organization policy.
+The complete staged diff is retained locally for fingerprints and Commit provenance. Raw diff has a fixed 8 MiB safety ceiling.
 
-## Project configuration boundary
+### 3. Codex executable
 
-`.codex-commit.json` is treated as untrusted repository content and is read only from the exact captured HEAD. Working-tree and staged policy edits take effect after commit. The policy is rejected when its HEAD entry is a symlink/non-regular file, too large, malformed, or contains unknown fields.
+The configured executable is trusted only as a local executable boundary, not as a source of policy.
 
-Project configuration cannot set the Codex executable, model, environment variables, working directory, or arbitrary commands. The executable path and model are application-scoped User Settings and are checked again at runtime.
+Safe Core performs capability negotiation using version/help output. Required generation capabilities include:
 
-`scopeHints` are bounded static strings used only by local scope scoring and are never executed or forwarded as commands. `scopePolicy=strict` is enforced both in the Structured Output schema and by local result validation.
+- `--ask-for-approval never`;
+- `exec --json`;
+- ephemeral execution;
+- `--ignore-user-config`;
+- `--ignore-rules`;
+- read-only sandbox;
+- output schema;
+- explicit Safe Core configuration overrides.
 
-## Repository consistency
+Shell, unified exec, web search, apps, multi-agent, remote plugins, hooks, goals, memories and related capabilities are disabled for the request. If a required capability is missing or a required safety argument is rejected, execution fails closed. There is no compatibility fallback that weakens the contract.
 
-The generated message must describe the exact staged state that was analyzed. The extension snapshots both:
+Codex executes from a temporary directory rather than the repository.
 
-- the current `HEAD` object ID, including an explicit unborn-HEAD state; and
-- a SHA-256 fingerprint of the raw `git ls-files --stage -z` index bytes.
+### 4. Repository policy
 
-The snapshot is checked before and after input collection and again before writing the generated message. If HEAD or the Git index changes, the result is discarded. A newer request also supersedes any older in-flight generation for the same repository.
+The only repository policy is `.codex-safe.json` schema v2. Commit consumes only the `commit` section from the exact captured HEAD.
 
-When Codex Review Safe is installed, Commit may query its read-only Extension API for a versioned receipt matching the exact HEAD/index snapshot. The receipt changes only status text; missing, stale, invalid, or unavailable evidence never authorizes an automatic commit.
+Working-tree/staged policy edits cannot change the policy used to describe their own commit. Unknown fields and malformed policy fail closed.
 
-## Multi-repository workspaces
+Repository policy cannot configure:
 
-Repository-specific SCM input is preferred. If a multi-repository workspace cannot reliably identify the correct commit input box, the extension fails closed instead of writing to a potentially wrong repository.
+- Codex executable;
+- model;
+- environment variables;
+- working directory;
+- arbitrary commands.
+
+`safeCodexCommit.codexPath` is machine-scoped. Model selection is an application-level user preference.
+
+### 5. Model output
+
+AI output is untrusted structured data. Before it reaches the SCM input box, Commit Safe validates:
+
+- closed output schema;
+- allowed Conventional Commit type;
+- scope syntax and optional strict scope allow-list;
+- subject/body lengths;
+- control characters;
+- body item types/counts.
+
+The model never commits, pushes or modifies project source files.
+
+## Semantic Context Budget
+
+`maxDiffBytes` is the model-context budget, not the raw-diff limit.
+
+Safe Core parses unified diff by file:
+
+- source files get fair per-file allocation;
+- generated/lock files are metadata-only;
+- binary files are metadata-only;
+- oversized source files retain bounded head/tail context.
+
+This prevents a large generated file or early diff block from consuming the entire model context. Fingerprints and provenance still use the complete original diff.
+
+## Repository style intelligence
+
+When enabled, recent Commit subjects are read from the exact HEAD snapshot and reduced locally to bounded statistics. Raw historical subject text is not appended to the model prompt. Set `styleHistoryLimit=0` to disable this feature.
+
+## Review and Commit receipts
+
+A matching Codex Review Safe Receipt v2 may be referenced by fingerprint in the generated Commit Receipt v2.
+
+Commit Receipt v2 binds:
+
+- parent HEAD;
+- raw-index fingerprint;
+- complete diff fingerprint;
+- final Commit Message fingerprint;
+- policy fingerprint;
+- optional Review Receipt fingerprint;
+- generation metadata.
+
+The receipt is initially pending because Commit Safe never performs the commit itself.
+
+When Codex PR Safe later requests range evidence, Commit Safe recomputes the real first-parent commit diff and final commit message. A pending receipt is bound to a real `commitOid` only when the parent/diff/message fingerprints match. Editing the message or committed content invalidates provenance.
+
+Receipts are workflow evidence, not authorization to commit and not proof of tests or human approval.
 
 ## Process handling
 
-Native executables are started without a shell. On Windows, `.cmd` and `.bat` shims are invoked through `cmd.exe` with explicit quoting and `windowsVerbatimArguments`, avoiding an unrestricted shell command string. Timeouts, cancellation, process-tree termination, and stdout/stderr size limits are enforced.
-
-An explicitly configured Codex executable is considered usable only when `<path> --version` exits successfully and returns version information.
+Process execution is delegated to Safe Core. Native processes run without an unrestricted shell. Windows `.cmd`/`.bat` handling uses explicit quoting. Cancellation, timeout, process-tree termination and stdout/stderr limits are enforced.
 
 ## Logging
 
-The Codex Commit Safe output channel records operational status only. It must not log source code, staged diff contents, generated commit messages, or absolute repository paths.
+Operational logs must not persist:
+
+- source code;
+- staged diff contents;
+- generated Commit Message;
+- secrets;
+- absolute repository paths.
+
+## Data flow
+
+Model context leaves the local machine for the configured Codex service. Use the extension only when allowed by the organization's source-code/data policy.
+
+Organization-managed Codex policy, managed hooks, MDM or cloud controls may still apply; the extension does not attempt to bypass them.
 
 ## Release supply chain
 
-GitHub Actions validation jobs run with read-only repository permissions. Only the final release job receives `contents: write`.
+The Marketplace/Release runtime is `dist/extension.js`; the canonical policy schema is shipped as `dist/codex-safe.schema.json`. CI rejects source, tests, scripts and submodule metadata in the VSIX.
 
-Release tags must use `vMAJOR.MINOR.PATCH`, match `package.json.version`, and point to a commit reachable from `main`. The release gate runs unit/regression tests, latest VS Code Extension Host tests on Linux/Windows/macOS, a minimum VS Code `1.90.0` compatibility test, official VSIX packaging, package-content checks, and SHA-256 generation.
+Validation jobs use read-only repository permissions. Only the final release job receives:
 
-Third-party GitHub Actions used by the workflows are pinned to immutable commit SHAs and maintained through Dependabot.
+- `contents: write`;
+- `id-token: write`;
+- `attestations: write`.
+
+Release validation includes unit/regression tests, Linux/Windows/macOS Extension Host tests, minimum VS Code `1.90.0`, VSIX boundary audit and SHA-256 generation.
+
+GitHub Actions are pinned to immutable full commit SHAs. Release artifacts (`.vsix` and `SHA256SUMS`) receive GitHub build-provenance attestations.
+
+## Reporting a vulnerability
+
+Do not disclose security-sensitive issues publicly before remediation. Use the repository's GitHub security reporting mechanism when available, or contact the maintainer privately through the repository owner profile.
