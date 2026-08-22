@@ -27,6 +27,9 @@ function createState() {
 }
 
 (async () => {
+  assert.strictEqual(COMMIT_RECEIPT_SCHEMA_VERSION, 3);
+  assert.strictEqual(RECEIPT_STORAGE_KEY, 'safeCodexCommit.receipts.v3');
+
   const state = createState();
   let committedMessage = `${message}\n`;
   const git = async args => {
@@ -52,14 +55,17 @@ function createState() {
     messageFingerprint: fingerprintCommitMessage(message),
     policyFingerprint: '2'.repeat(64),
     reviewReceiptFingerprint: '3'.repeat(64),
+    model: 'gpt-test',
+    codexVersion: 'codex-cli 9.9.9',
     createdAt: '2026-08-22T00:00:00.000Z',
     commitOid: '<pending>'
   });
   assert(pending);
+  assert.strictEqual(validateCommitReceipt({ ...pending, schemaVersion: 2 }), null, 'Commit Receipt v2 must stay invalid');
   await store.persistPending('/repo', pending);
 
   const evidence = await store.getEvidenceForRange('/repo', 'main', 'HEAD');
-  assert.strictEqual(evidence.schemaVersion, 2);
+  assert.strictEqual(evidence.schemaVersion, 3);
   assert.strictEqual(evidence.totalCommits, 1);
   assert.strictEqual(evidence.generatedCommits, 1);
   assert.strictEqual(evidence.reviewedGeneratedCommits, 1);
@@ -70,7 +76,7 @@ function createState() {
   const edited = await store.getEvidenceForRange('/repo', 'main', 'HEAD');
   assert.strictEqual(edited.generatedCommits, 0, 'edited commit message must invalidate provenance');
 
-  console.log('Commit receipt provenance tests passed.');
+  console.log('Commit Receipt v3 provenance tests passed.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

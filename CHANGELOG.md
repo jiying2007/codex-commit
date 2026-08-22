@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 3.0.0
+
+### Changed
+
+- Hard-switched to Codex Safe Core 3.0.1 and Policy Schema v3.
+- Hard-switched Commit Receipt and Review Receipt provenance to schema v3 with no v2 storage fallback.
+- Preserved Commit-domain behavior while centralizing shared safety/runtime contracts in Core.
+
 ## 2.1.0
 
 - Pin Codex Safe Core 2.1 as the canonical policy/process/Git/context/contract runtime.

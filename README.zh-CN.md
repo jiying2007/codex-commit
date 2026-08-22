@@ -8,9 +8,9 @@ Codex Commit Safe 是 **Codex Safe Git Workflow** 产品族的 Commit 阶段：
 
 ```text
 Codex Review Safe
-      ↓ Review Receipt v2
+      ↓ Review Receipt v3
 Codex Commit Safe
-      ↓ Commit Receipt v2
+      ↓ Commit Receipt v3
 Codex PR Safe
       ↓ 可验证 PR provenance
 ```
@@ -28,7 +28,7 @@ Codex PR Safe
 - Structured Output 必须经过本地 schema 和语义校验后才写入 SCM 输入框。
 - HEAD 或 Git 原始 index 变化时丢弃 stale result。
 - 如果存在匹配的 Codex Review Safe Receipt，则纳入 Commit provenance。
-- 生成与 HEAD、index、完整 diff、最终 message、policy、Review evidence 绑定的 pending Commit Receipt v2。
+- 生成与 HEAD、index、完整 diff、最终 message、policy、Review evidence 绑定的 pending Commit Receipt v3。
 - 向 Codex PR Safe 暴露经过重新验证的 Commit range evidence。
 
 ## 明确不会做的事
@@ -42,7 +42,7 @@ Codex PR Safe
 
 ## 安全边界
 
-Codex 执行采用 fail-closed。固定的 Safe Core v2 contract 要求 CLI 具备：
+Codex 执行采用 fail-closed。固定的 Safe Core v3 contract 要求 CLI 具备：
 
 - `--ask-for-approval never`
 - `exec --json`
@@ -64,12 +64,12 @@ Codex 执行采用 fail-closed。固定的 Safe Core v2 contract 要求 CLI 具�
 
 ## 唯一仓库策略文件
 
-仓库只认 `.codex-safe.json`，且必须使用 `schemaVersion: 2`。
+仓库只认 `.codex-safe.json`，且必须使用 `schemaVersion: 3`。
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/d49dc356824b984166e81e42bb5f9d7abfb90099/codex-safe.schema.json",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "commit": {
     "language": "zh-CN",
     "maxDiffBytes": 262144,
