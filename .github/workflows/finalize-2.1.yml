@@ -47,7 +47,7 @@ jobs:
             fs.writeFileSync('CHANGELOG.md',c);
           }
           NODE
-          python3 <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
           p=Path('.github/workflows/ci.yml'); s=p.read_text()
           if 'workflow_dispatch:' not in s.split('permissions:',1)[0]: s=s.replace('  pull_request:\n','  pull_request:\n  workflow_dispatch:\n',1)
@@ -96,3 +96,8 @@ jobs:
           }
           verify "$ci" 'ci-2.1-final'
           verify "$rel" 'release-2.1-final'
+      - name: Expose finalizer failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=failure -f context='finalize-2.1' -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >/dev/null
