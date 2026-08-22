@@ -1,4 +1,4 @@
-# rerun-js-gate: eadca528e4d5470014fdb76c0138a299ff2119f4
+# rerun-product-policy-tests: eadca528e4d5470014fdb76c0138a299ff2119f4
 name: Finalize 2.1
 on:
   push:
