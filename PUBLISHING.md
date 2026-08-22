@@ -1,6 +1,6 @@
 # Publishing
 
-Codex Commit Safe releases are immutable, reproducible GitHub Actions builds from a committed source revision, locked npm graph and commit-pinned Codex Safe Core v2 submodule.
+Codex Commit Safe releases are immutable, reproducible GitHub Actions builds from a committed source revision, locked npm graph and commit-pinned Codex Safe Core v3 submodule.
 
 ## Release source requirements
 
@@ -19,7 +19,7 @@ A release is valid only when:
 
 - `package.json` and `package-lock.json` name/version/devDependencies/engines agree;
 - the Core path is a `160000` Git submodule gitlink pointing to `jiying2007/codex-safe-core`;
-- the Core v2 contract/schema checks pass;
+- the Core v3 contract/schema checks pass;
 - unit, regression, provenance, syntax and module-boundary checks pass;
 - latest VS Code Extension Host tests pass on Linux, Windows and macOS;
 - minimum VS Code `1.90.0` passes;

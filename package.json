@@ -2,7 +2,7 @@
   "name": "codex-commit-safe",
   "displayName": "Codex Commit Safe",
   "description": "%extension.description%",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {

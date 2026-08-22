@@ -1,6 +1,6 @@
 # Security
 
-Codex Commit Safe follows the **Codex Safe Core v2** contract. Security-sensitive shared primitives are owned by the pinned `codex-safe-core` submodule; the extension repository owns Commit-specific domain logic only.
+Codex Commit Safe follows the **Codex Safe Core v3** contract. Security-sensitive shared primitives are owned by the pinned `codex-safe-core` submodule; the extension repository owns Commit-specific domain logic only.
 
 ## Trust boundaries
 
@@ -89,9 +89,9 @@ When enabled, recent Commit subjects are read from the exact HEAD snapshot and r
 
 ## Review and Commit receipts
 
-A matching Codex Review Safe Receipt v2 may be referenced by fingerprint in the generated Commit Receipt v2.
+A matching Codex Review Safe Receipt v2 may be referenced by fingerprint in the generated Commit Receipt v3.
 
-Commit Receipt v2 binds:
+Commit Receipt v3 binds:
 
 - parent HEAD;
 - raw-index fingerprint;
