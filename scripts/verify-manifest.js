@@ -52,15 +52,9 @@ if (!/await fingerprintDiff\(diff\)/.test(extensionSource)) fail('Commit receipt
 
 if (pkg.main !== './dist/extension.js') fail('package main must point to dist/extension.js.');
 if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exactly to 0.28.2.');
-if (pkg.devDependencies?.typescript !== '7.0.2') fail('TypeScript must be pinned exactly to 7.0.2.');
-if (pkg.devDependencies?.['@types/node'] !== '26.2.0') fail('@types/node must be pinned exactly to 26.2.0.');
-if (pkg.scripts?.['check:types'] !== 'tsc -p tsconfig.pure.json') fail('check:types must run the strict pure-module TypeScript gate.');
-
-const typecheckConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.pure.json'), 'utf8'));
-for (const requiredModule of ['src/commit-style.js', 'src/scope-intelligence.js', 'src/policy-validation.js', 'src/git-repository.js', 'src/commit-runtime.js', 'src/receipts.js']) {
-  if (!(typecheckConfig.include || []).includes(requiredModule)) fail(`strict TypeScript gate must include ${requiredModule}`);
-}
-if ((typecheckConfig.include || []).includes('src/process-runner.js')) fail('strict TypeScript gate still references removed process proxy.');
+if (pkg.devDependencies?.typescript !== undefined || pkg.devDependencies?.['@types/node'] !== undefined) fail('Commit must not carry the removed TypeScript checkJs dual-track.');
+if (pkg.scripts?.['check:types'] !== undefined) fail('check:types compatibility script must not return.');
+if (fs.existsSync(path.join(root, 'tsconfig.pure.json'))) fail('tsconfig.pure.json must not return.');
 
 if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) fail('extensionKind must be ["workspace"].');
 const properties = pkg.contributes?.configuration?.properties || {};
@@ -70,4 +64,4 @@ for (const [key, value] of Object.entries(properties)) {
   if (value.scope !== 'application') fail(`${key} must use application scope.`);
 }
 
-console.log('Codex Commit Safe ownership, service boundaries, dist boundary, Core gitlink, policy and provenance gates verified.');
+console.log('Codex Commit Safe ownership, service boundaries, JS runtime gates, dist boundary, Core gitlink, policy and provenance gates verified.');
