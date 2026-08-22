@@ -3,6 +3,7 @@
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
+    "noResolve": true,
     "strict": true,
     "target": "ES2022",
     "module": "Node16",
