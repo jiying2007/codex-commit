@@ -1,10 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const {
-  PROJECT_RULE_KEYS,
-  createPolicyValidators
-} = require('../src/policy-validation');
+const { createPolicyValidators } = require('../src/policy-validation');
 
 const ui = (_zh, en) => en;
 const {
@@ -16,9 +13,6 @@ const {
   validateScopePolicy,
   validateExtraInstructions
 } = createPolicyValidators(ui);
-
-assert(PROJECT_RULE_KEYS.has('styleHistoryLimit'));
-assert.strictEqual(PROJECT_RULE_KEYS.size, 11);
 
 assert.strictEqual(clampNumber(undefined, 72, 30, 120, 'subjectMaxLength'), 72);
 assert.strictEqual(clampNumber(71.6, 72, 30, 120, 'subjectMaxLength'), 72);
@@ -58,4 +52,4 @@ assert.throws(() => validateExtraInstructions('x'.repeat(4001)), /cannot exceed 
 const zhValidators = createPolicyValidators((zh) => zh);
 assert.throws(() => zhValidators.validateScopePolicy('legacy'), /不支持/);
 
-console.log('project policy validation tests passed.');
+console.log('Commit product policy merge/normalization tests passed. Canonical repository-policy field ownership remains in Safe Core.');
