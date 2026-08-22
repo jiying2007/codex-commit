@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-- Add a cross-platform local release CLI that prepares versions, enforces release gates, pushes `main`, and verifies the automated GitHub Release without creating local tags.
+- Breaking: hard-switch to Codex Safe Core v2 as the only shared runtime/safety source through a commit-pinned Git submodule; remove copied vendoring, sync locks, compatibility shims, and legacy policy paths.
+- Replace `.codex-commit.json` with the unified `.codex-safe.json` schema v2 `commit` section; v1 policy is intentionally unsupported.
+- Route model input through Safe Core Semantic Context Budget while preserving the complete staged diff for fingerprints/provenance; enforce a fixed 8 MiB raw staged-diff safety ceiling.
+- Add Commit Receipt v2 persistence and verified first-parent range binding using parent HEAD, full diff, final Commit Message, policy, and optional Review Receipt fingerprints.
+- Expose verified Commit provenance to Codex PR Safe; edited messages/content/parents automatically invalidate provenance.
+- Standardize the Marketplace runtime on `dist/extension.js` plus `dist/codex-safe.schema.json`, with CI rejecting source/tests/scripts/submodule metadata in VSIX artifacts.
+- Unify the CI/release gate, add SHA-256 and full-SHA-pinned GitHub build-provenance attestations, and keep release write/OIDC/attestation permissions confined to the final release job.
+- Rewrite English/Chinese user, security, and publishing documentation around the v2 contract and product-family boundary.
 
 ## 1.3.3
 
