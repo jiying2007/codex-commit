@@ -7,6 +7,8 @@ const {
   SAFE_CORE_VERSION,
   SAFE_CONTRACT_VERSION,
   POLICY_SCHEMA_VERSION,
+  REVIEW_RECEIPT_SCHEMA_VERSION,
+  COMMIT_RECEIPT_SCHEMA_VERSION,
   POLICY_SECTION_KEYS
 } = require('../src/codex-safe-core');
 
@@ -19,11 +21,20 @@ function fail(message) {
   process.exit(2);
 }
 
-if (SAFE_CORE_VERSION !== 2 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 2) fail('Codex Safe Core v2 contract is required.');
+if (
+  SAFE_CORE_VERSION !== 3 ||
+  SAFE_CONTRACT_VERSION !== 2 ||
+  POLICY_SCHEMA_VERSION !== 3 ||
+  REVIEW_RECEIPT_SCHEMA_VERSION !== 3 ||
+  COMMIT_RECEIPT_SCHEMA_VERSION !== 3
+) {
+  fail('Family v3 requires Safe Core 3, Safe Contract 2, Policy Schema 3, Review Receipt 3 and Commit Receipt 3.');
+}
 if (!Array.isArray(POLICY_SECTION_KEYS?.commit)) fail('Core must expose canonical commit policy keys.');
 if (!fs.existsSync(schemaPath)) fail('canonical Codex Safe schema is missing from the Core submodule.');
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+if (schema.properties?.schemaVersion?.const !== 3) fail('canonical policy schema must be schemaVersion 3.');
 const commitSchema = schema.properties?.commit;
 if (!commitSchema || commitSchema.additionalProperties !== false) fail('canonical commit policy schema must fail closed.');
 const schemaKeys = Object.keys(commitSchema.properties || {}).sort();
@@ -64,4 +75,4 @@ for (const [key, value] of Object.entries(properties)) {
   if (value.scope !== 'application') fail(`${key} must use application scope.`);
 }
 
-console.log('Codex Commit Safe ownership, service boundaries, JS runtime gates, dist boundary, Core gitlink, policy and provenance gates verified.');
+console.log('Codex Commit Safe Family v3 ownership, service boundaries, JS runtime gates, dist boundary, Core gitlink, Policy v3 and Receipt v3 gates verified.');
