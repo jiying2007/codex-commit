@@ -1,4 +1,5 @@
 {
+  "extension.displayName": "Codex Commit Safe",
   "extension.description": "使用本地 Codex CLI，根据 Git 暂存区变更安全生成结构化 Conventional Commit Message。",
   "command.generate.title": "生成 Commit Message",
   "command.regenerate.title": "重新生成 Commit Message",
