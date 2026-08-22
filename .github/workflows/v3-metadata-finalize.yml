@@ -1,0 +1,60 @@
+name: Family v3 metadata finalizer
+
+on:
+  push:
+    branches: [feat/family-v3-commit]
+    paths: [.github/workflows/v3-metadata-finalize.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: { node-version: '22' }
+      - name: Finalize v3 metadata and docs
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('fs');
+          const version='3.0.0';
+          for(const p of ['package.json','package-lock.json']){
+            const j=JSON.parse(fs.readFileSync(p,'utf8'));
+            j.version=version;
+            if(j.packages?.['']) j.packages[''].version=version;
+            fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');
+          }
+          let c=fs.readFileSync('CHANGELOG.md','utf8');
+          if(!c.includes('\n## 3.0.0\n')) c=c.replace('## Unreleased\n','## Unreleased\n\n## 3.0.0\n\n### Changed\n\n- Hard-switched to Codex Safe Core 3.0.1 and Policy Schema v3.\n- Hard-switched Commit Receipt and Review Receipt provenance to schema v3 with no v2 storage fallback.\n- Preserved Commit-domain behavior while centralizing shared safety/runtime contracts in Core.\n');
+          fs.writeFileSync('CHANGELOG.md',c);
+          const replacements=[
+            [/Codex Safe Core 2\.1/g,'Codex Safe Core 3.0.1'],
+            [/Core v2/g,'Core v3'],
+            [/Safe Core v2/g,'Safe Core v3'],
+            [/Policy Schema v2/g,'Policy Schema v3'],
+            [/Review Receipt v2/g,'Review Receipt v3'],
+            [/Commit Receipt v2/g,'Commit Receipt v3'],
+            [/schemaVersion: 2/g,'schemaVersion: 3'],
+            [/"schemaVersion": 2/g,'"schemaVersion": 3'],
+            [/eadca528e4d5470014fdb76c0138a299ff2119f4/g,'e6e25b502aa35a079f660346785cf283fe293b6d']
+          ];
+          for(const p of ['README.md','README.zh-CN.md','SECURITY.md','PUBLISHING.md','.codex-safe.example.json']){
+            if(!fs.existsSync(p)) continue;
+            let s=fs.readFileSync(p,'utf8');
+            for(const [a,b] of replacements) s=s.replace(a,b);
+            fs.writeFileSync(p,s);
+          }
+          NODE
+          npm run verify:lock
+          git rm .github/workflows/v3-metadata-finalize.yml
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package.json package-lock.json CHANGELOG.md README.md README.zh-CN.md SECURITY.md PUBLISHING.md .codex-safe.example.json 2>/dev/null || true
+          git commit -m 'chore(release): finalize Codex Commit Safe v3.0.0'
+          git push origin HEAD:feat/family-v3-commit
