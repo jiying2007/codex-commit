@@ -8,7 +8,7 @@ permissions:
 jobs:
   finalize:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -18,68 +18,275 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Refactor Commit orchestration
+      - name: Write explicit production modules
         shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
-          const fs=require('fs');
-          let ext=fs.readFileSync('extension.js','utf8');
-          const begin=ext.indexOf('function getUserOnlySetting');
-          const end=ext.indexOf('async function setCommitInput');
-          if(begin<0||end<0||end<=begin) throw new Error('policy block not found');
-          const policyBlock=ext.slice(begin,end);
-          const helperNames=['getUserOnlySetting','getEffectiveOptions'];
-          let policy="'use strict';\n\nconst vscode=require('vscode');\nconst { fingerprintPolicy }=require('./codex-safe-core/safe-contract');\nconst { createPolicyValidators }=require('./policy-validation');\nconst { createGitRepository }=require('./git-repository');\nconst { createProcessRunner }=require('./codex-safe-core/process-runner');\n\n";
-          policy += policyBlock;
-          policy += '\nmodule.exports={ getUserOnlySetting, getEffectiveOptions };\n';
-          fs.writeFileSync('src/policy.js',policy);
-          ext=ext.slice(0,begin)+ext.slice(end);
-          ext=ext.replace("const { createPolicyValidators } = require('./src/policy-validation');\n",'');
-          ext=ext.replace(/const \{\n  clampNumber,[\s\S]*?\} = createPolicyValidators\(ui\);\n\n/,'');
-          ext=ext.replace("const { createGitRepository } = require('./src/git-repository');\n","const { createGitRepository } = require('./src/git-repository');\nconst { getEffectiveOptions } = require('./src/policy');\n");
-          fs.writeFileSync('extension.js',ext);
-          NODE
-          node <<'NODE'
-          const fs=require('fs');
-          const pkg=require('./package.json');
-          pkg.scripts.check=pkg.scripts.check.replace('node --check src/policy-validation.js && ','node --check src/policy-validation.js && node --check src/policy.js && ');
-          pkg.scripts['test:unit']=pkg.scripts['test:unit'].replace('node test/policy-validation.test.js && ','node test/policy-validation.test.js && node test/policy.test.js && ');
-          fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
-          const lock=require('./package-lock.json'); lock.packages[''].version=pkg.version; lock.version=pkg.version; fs.writeFileSync('package-lock.json',JSON.stringify(lock,null,2)+'\n');
-          let ts=JSON.parse(fs.readFileSync('tsconfig.pure.json','utf8')); if(!ts.include.includes('src/policy.js')) ts.include.push('src/policy.js'); fs.writeFileSync('tsconfig.pure.json',JSON.stringify(ts,null,2)+'\n');
-          NODE
-          cat > test/policy.test.js <<'EOF'
+          cat > src/ui.js <<'EOF'
           'use strict';
-          const assert=require('assert');
+          const vscode = require('vscode');
+          function isChineseUi() { return /^(?:zh-cn|zh-hans)(?:-|$)/i.test(String(vscode.env?.language || '')); }
+          function ui(zh, en) { return isChineseUi() ? zh : en; }
+          function friendlyError(error) {
+            const detail = error?.stderr || error?.message || String(error);
+            if (error?.code === 'ETIMEDOUT') return ui(`${detail}。可提高 safeCodexCommit.timeoutSeconds，或检查 Codex 网络/登录状态。`, `${detail}. Increase safeCodexCommit.timeoutSeconds or check Codex network/authentication status.`);
+            return detail;
+          }
+          module.exports = Object.freeze({ isChineseUi, ui, friendlyError });
+          EOF
+          cat > src/policy.js <<'EOF'
+          'use strict';
+          const vscode = require('vscode');
+          const { fingerprintPolicy } = require('./codex-safe-core/safe-contract');
+          const { POLICY_FILE } = require('./codex-safe-core/policy');
+          const { createPolicyValidators } = require('./policy-validation');
+          function getUserOnlySetting(config, key, fallback) {
+            const inspected = config.inspect(key);
+            if (!inspected) return fallback;
+            if (inspected.globalLanguageValue !== undefined) return inspected.globalLanguageValue;
+            if (inspected.globalValue !== undefined) return inspected.globalValue;
+            return inspected.defaultValue !== undefined ? inspected.defaultValue : fallback;
+          }
+          function createCommitPolicy({ ui, readProjectRulesAtHead }) {
+            if (typeof ui !== 'function' || typeof readProjectRulesAtHead !== 'function') throw new TypeError('createCommitPolicy requires ui and readProjectRulesAtHead.');
+            const { clampNumber, validateScopes, validateScopeHints, mergeScopeHints, filterScopeHints, validateScopePolicy, validateExtraInstructions } = createPolicyValidators(ui);
+            async function getEffectiveOptions(repoRoot, headOid, token) {
+              const config = vscode.workspace.getConfiguration('safeCodexCommit', vscode.Uri.file(repoRoot));
+              const policy = await readProjectRulesAtHead(repoRoot, headOid, token);
+              const project = policy.rules;
+              const codexPath = String(getUserOnlySetting(config, 'codexPath', 'codex') || 'codex').trim();
+              const model = String(getUserOnlySetting(config, 'model', '') || '').trim();
+              if (!codexPath || codexPath.length > 1024 || /[\r\n\0]/.test(codexPath)) throw new Error(ui('User-level safeCodexCommit.codexPath 非法。', 'User-level safeCodexCommit.codexPath is invalid.'));
+              if (model.length > 128 || /[\r\n\0]/.test(model)) throw new Error(ui('User-level safeCodexCommit.model 非法。', 'User-level safeCodexCommit.model is invalid.'));
+              const language = project.language ?? config.get('language', 'zh-CN');
+              if (!['zh-CN', 'en'].includes(language)) throw new Error(ui(`language 不支持：${language}`, `Unsupported language: ${language}`));
+              const configuredScopes = validateScopes(config.get('scopes', []), []);
+              const scopes = validateScopes(project.scopes, configuredScopes);
+              const configuredScopeHints = validateScopeHints(config.get('scopeHints', {}), configuredScopes, 'safeCodexCommit.scopeHints');
+              const userScopeHints = filterScopeHints(configuredScopeHints, scopes);
+              const projectScopeHints = validateScopeHints(project.scopeHints, scopes, `${POLICY_FILE}.commit.scopeHints`);
+              const scopeHints = mergeScopeHints(userScopeHints, projectScopeHints);
+              const scopePolicy = validateScopePolicy(project.scopePolicy ?? config.get('scopePolicy', 'flexible'));
+              if (scopePolicy === 'strict' && scopes.length === 0) throw new Error(ui('scopePolicy=strict 时至少需要配置一个 scope。', 'scopePolicy=strict requires at least one configured scope.'));
+              const extraInstructions = [validateExtraInstructions(config.get('extraInstructions', '')), validateExtraInstructions(project.extraInstructions)].filter(Boolean).join('\n');
+              if (extraInstructions.length > 4000) throw new Error(ui('合并后的 extraInstructions 最长 4000 字符。', 'Combined extraInstructions cannot exceed 4000 characters.'));
+              const options = {
+                codexPath, model, language,
+                maxDiffBytes: clampNumber(project.maxDiffBytes ?? config.get('maxDiffBytes', 262144), 262144, 4096, 2097152, 'maxDiffBytes'),
+                subjectMaxLength: clampNumber(project.subjectMaxLength ?? config.get('subjectMaxLength', 72), 72, 30, 120, 'subjectMaxLength'),
+                maxBodyChars: clampNumber(project.maxBodyChars ?? config.get('maxBodyChars', 2000), 2000, 200, 10000, 'maxBodyChars'),
+                scopes, scopeHints, scopePolicy,
+                autoInferScope: typeof project.autoInferScope === 'boolean' ? project.autoInferScope : Boolean(config.get('autoInferScope', true)),
+                styleHistoryLimit: clampNumber(project.styleHistoryLimit ?? config.get('styleHistoryLimit', 12), 12, 0, 50, 'styleHistoryLimit'),
+                extraInstructions,
+                timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds'),
+                policySource: policy.source,
+                projectPolicyFingerprint: policy.fingerprint
+              };
+              options.policyFingerprint = fingerprintPolicy({ language: options.language, maxDiffBytes: options.maxDiffBytes, subjectMaxLength: options.subjectMaxLength, maxBodyChars: options.maxBodyChars, scopes: options.scopes, scopeHints: options.scopeHints, scopePolicy: options.scopePolicy, autoInferScope: options.autoInferScope, styleHistoryLimit: options.styleHistoryLimit, extraInstructions: options.extraInstructions, timeoutSeconds: options.timeoutSeconds, projectPolicyFingerprint: options.projectPolicyFingerprint });
+              return Object.freeze(options);
+            }
+            return Object.freeze({ getEffectiveOptions });
+          }
+          module.exports = Object.freeze({ getUserOnlySetting, createCommitPolicy });
+          EOF
+          cat > src/repository-ui.js <<'EOF'
+          'use strict';
+          const vscode = require('vscode');
+          const path = require('path');
+          function createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext, ui }) {
+            async function getGitApi() {
+              const extension = vscode.extensions.getExtension('vscode.git');
+              if (!extension) return undefined;
+              const exports = extension.isActive ? extension.exports : await extension.activate();
+              return exports?.getAPI?.(1);
+            }
+            async function getRepositories() {
+              const api = await getGitApi();
+              if (api?.repositories?.length) return api.repositories.map(repo => ({ root: repo.rootUri.fsPath, repo }));
+              const result = []; const seen = new Set();
+              for (const folder of vscode.workspace.workspaceFolders || []) {
+                try {
+                  const { stdout } = await git(['rev-parse', '--show-toplevel'], folder.uri.fsPath);
+                  const root = stdout.trim(); const key = normalizeFsPath(root);
+                  if (root && !seen.has(key)) { seen.add(key); result.push({ root, repo: undefined }); }
+                } catch {}
+              }
+              return result;
+            }
+            async function chooseRepository(commandArgs = []) {
+              const repositories = await getRepositories();
+              if (!repositories.length) throw new Error(ui('当前工作区未检测到 Git 仓库。', 'No Git repository was detected in the current workspace.'));
+              const contextual = repositoryFromCommandContext(repositories, commandArgs);
+              if (contextual) return { ...contextual, repositoryCount: repositories.length };
+              const activePath = vscode.window.activeTextEditor?.document?.uri?.fsPath;
+              if (activePath) {
+                const matches = repositories.filter(item => { const root=normalizeFsPath(item.root); const active=normalizeFsPath(activePath); return active===root || active.startsWith(root+path.sep); }).sort((a,b)=>b.root.length-a.root.length);
+                if (matches.length) return { ...matches[0], repositoryCount: repositories.length };
+              }
+              if (repositories.length === 1) return { ...repositories[0], repositoryCount: 1 };
+              const selected = await vscode.window.showQuickPick(repositories.map(item => ({ label:path.basename(item.root), description:item.root, item })), { placeHolder: ui('选择要生成 Commit Message 的 Git 仓库', 'Select the Git repository for the Commit Message') });
+              return selected?.item ? { ...selected.item, repositoryCount: repositories.length } : undefined;
+            }
+            async function setCommitInput(repositoryInfo, message) {
+              if (repositoryInfo.repo?.inputBox) { repositoryInfo.repo.inputBox.value = message; return; }
+              if (repositoryInfo.repositoryCount === 1) { vscode.scm.inputBox.value = message; return; }
+              throw new Error(ui('无法可靠定位多仓库工作区的 Git Commit 输入框；为避免写错仓库，已拒绝写入。', 'Cannot reliably identify the Git commit input in a multi-repository workspace; refusing to write to avoid targeting the wrong repository.'));
+            }
+            function getCurrentCommitInput(repositoryInfo) {
+              if (repositoryInfo.repo?.inputBox) return repositoryInfo.repo.inputBox.value || '';
+              if (repositoryInfo.repositoryCount === 1) return vscode.scm.inputBox.value || '';
+              throw new Error(ui('无法可靠读取多仓库工作区的 Git Commit 输入框；请确保 VS Code 内置 Git 扩展可用。', 'Cannot reliably read the Git commit input in a multi-repository workspace. Make sure the built-in VS Code Git extension is available.'));
+            }
+            return Object.freeze({ getGitApi, getRepositories, chooseRepository, setCommitInput, getCurrentCommitInput });
+          }
+          module.exports = Object.freeze({ createRepositoryUi });
+          EOF
+          cat > src/review-evidence.js <<'EOF'
+          'use strict';
+          const vscode = require('vscode');
+          const { validateReviewReceipt } = require('./codex-safe-core/safe-contract');
+          const REVIEW_EXTENSION_ID = 'jiying2007.codex-review-safe';
+          async function getReviewEvidence(repoRoot, snapshot) {
+            try {
+              const extension = vscode.extensions.getExtension(REVIEW_EXTENSION_ID);
+              if (!extension) return { status:'unavailable', receipt:null };
+              const api = extension.isActive ? extension.exports : await extension.activate();
+              if (typeof api?.getReviewReceiptStatus !== 'function') return { status:'unsupported', receipt:null };
+              const result = await api.getReviewReceiptStatus(repoRoot, snapshot);
+              const receipt = result?.receipt ? validateReviewReceipt(result.receipt) : null;
+              if (result?.receipt && !receipt) return { status:'invalid', receipt:null };
+              if (!['current','stale','unavailable'].includes(result?.status)) return { status:'invalid', receipt:null };
+              return { status:result.status, receipt };
+            } catch { return { status:'error', receipt:null }; }
+          }
+          module.exports = Object.freeze({ REVIEW_EXTENSION_ID, getReviewEvidence });
+          EOF
+      - name: Reduce extension entry to orchestration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('extension.js'); s=p.read_text()
+          s=s.replace("const path = require('path');\n",'')
+          old="""const {\n  COMMIT_RECEIPT_SCHEMA_VERSION,\n  missingHelpFlags,\n  isCliCompatibilityError,\n  fingerprint,\n  fingerprintPolicy,\n  validateReviewReceipt,\n  validateCommitReceipt\n} = require('./src/codex-safe-core/safe-contract');\n"""
+          new="""const { COMMIT_RECEIPT_SCHEMA_VERSION, fingerprint, validateCommitReceipt } = require('./src/codex-safe-core/safe-contract');\n"""
+          if old not in s: raise SystemExit('safe contract import drifted')
+          s=s.replace(old,new)
+          old="""const {\n  tokenizeScopeEvidence,\n  parseScopeDiffSections,\n  inferScopeDecision,\n  inferScope,\n  emptyScopeDecision,\n  summarizeScopeDecision\n} = require('./src/scope-intelligence');\nconst { createPolicyValidators } = require('./src/policy-validation');\n"""
+          new="""const { inferScopeDecision, emptyScopeDecision, summarizeScopeDecision } = require('./src/scope-intelligence');\n"""
+          if old not in s: raise SystemExit('scope import drifted')
+          s=s.replace(old,new)
+          s=s.replace("const { createCommitReceiptStore, fingerprintCommitMessage } = require('./src/receipts');\n", "const { createCommitReceiptStore, fingerprintCommitMessage } = require('./src/receipts');\nconst { ui, friendlyError } = require('./src/ui');\nconst { createCommitPolicy } = require('./src/policy');\nconst { createRepositoryUi } = require('./src/repository-ui');\nconst { getReviewEvidence } = require('./src/review-evidence');\n")
+          start=s.index('function isChineseUi()'); end=s.index('const {\n  isWindowsScript,')
+          s=s[:start]+s[end:]
+          old="""const {\n  isWindowsScript,\n  quoteWindowsCmdArg,\n  prepareCommand,\n  runPreparedProcess,\n  runProcess,\n  runProcessBuffer\n} = createProcessRunner(ui);\n"""
+          new="""const { runPreparedProcess, runProcess, runProcessBuffer } = createProcessRunner(ui);\n"""
+          s=s.replace(old,new)
+          old="""const {\n  PROJECT_RULES_FILE,\n  git,\n  getRepositoryStyleGuidance,\n  normalizeFsPath,\n  repositoryFromCommandContext,\n  getStagedDiff,\n  getStagedPaths,\n  hasUnmergedEntries,\n  getIndexFingerprint,\n  getHeadOid,\n  getRepositorySnapshot,\n  repositorySnapshotsEqual,\n  fingerprintDiff,\n  readProjectRulesAtHead\n} = createGitRepository({ runProcess, runProcessBuffer, ui });\n"""
+          new="""const {\n  git, getRepositoryStyleGuidance, normalizeFsPath, repositoryFromCommandContext,\n  getStagedDiff, getStagedPaths, hasUnmergedEntries, getHeadOid, getRepositorySnapshot,\n  repositorySnapshotsEqual, fingerprintDiff, readProjectRulesAtHead\n} = createGitRepository({ runProcess, runProcessBuffer, ui });\n"""
+          if old not in s: raise SystemExit('git destructuring drifted')
+          s=s.replace(old,new)
+          old="""const {\n  buildPrompt,\n  outputSchema,\n  parseCodexJsonl,\n  validateStructuredResult,\n  formatCommitMessage,\n  resolveCodexExecutable,\n  probeCodexCapabilities,\n  buildCodexArgs,\n  runCodex\n} = createCommitRuntime({ runPreparedProcess, ui });\n"""
+          new="""const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, runCodex } = createCommitRuntime({ runPreparedProcess, ui });\n\nconst { getEffectiveOptions } = createCommitPolicy({ ui, readProjectRulesAtHead });\nconst { getRepositories, chooseRepository, setCommitInput, getCurrentCommitInput } = createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext, ui });\n"""
+          if old not in s: raise SystemExit('runtime destructuring drifted')
+          s=s.replace(old,new)
+          def cut(a,b):
+            global s
+            i=s.index(a); j=s.index(b,i); s=s[:i]+s[j:]
+          cut('function getUserOnlySetting(', 'async function getGitApi(')
+          cut('async function getGitApi(', 'async function getReviewEvidence(')
+          cut('async function getReviewEvidence(', 'async function getCommitEvidenceForRange(')
+          cut('async function getRepositories(', 'async function chooseRepository(')
+          cut('async function chooseRepository(', 'async function getEffectiveOptions(')
+          cut('async function getEffectiveOptions(', 'async function setCommitInput(')
+          cut('async function setCommitInput(', 'function getCurrentCommitInput(')
+          cut('function getCurrentCommitInput(', 'function beginGeneration(')
+          cut('function friendlyError(', 'function activate(')
+          i=s.index('module.exports = {')
+          s=s[:i]+"module.exports = Object.freeze({ activate, deactivate, getCommitEvidenceForRange });\n"
+          if '__test' in s: raise SystemExit('__test surface remains')
+          p.write_text(s)
+          PY
+      - name: Replace extension-coupled regression surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > test.js <<'EOF'
+          'use strict';
           const Module=require('module');
           const original=Module._load;
-          Module._load=function(request,parent,isMain){
-            if(request==='vscode') return { workspace:{ getConfiguration(){ return { inspect(){return undefined;}, get(_k,v){return v;} }; } }, Uri:{file:x=>({fsPath:x})} };
-            return original.apply(this,arguments);
-          };
-          const policy=require('../src/policy');
-          assert.strictEqual(typeof policy.getEffectiveOptions,'function');
-          assert.strictEqual(typeof policy.getUserOnlySetting,'function');
-          console.log('Commit policy module tests passed.');
+          const fakeVscode={ env:{language:'en'}, workspace:{}, window:{}, extensions:{}, scm:{} };
+          Module._load=function(request,parent,isMain){ if(request==='vscode') return fakeVscode; return original.apply(this,arguments); };
+          const assert=require('assert'); const fs=require('fs'); const path=require('path');
+          const { isChineseUi, ui }=require('./src/ui');
+          const { inferScope }=require('./src/scope-intelligence');
+          const { createPolicyValidators }=require('./src/policy-validation');
+          const { getUserOnlySetting }=require('./src/policy');
+          const pkg=require('./package.json');
+          fakeVscode.env.language='en'; assert.strictEqual(ui('中文','English'),'English');
+          fakeVscode.env.language='zh-cn'; assert.strictEqual(isChineseUi(),true); assert.strictEqual(ui('中文','English'),'中文');
+          fakeVscode.env.language='zh-tw'; assert.strictEqual(isChineseUi(),false);
+          const manifest=fs.readFileSync('package.json','utf8'); const en=JSON.parse(fs.readFileSync('package.nls.json','utf8')); const zh=JSON.parse(fs.readFileSync('package.nls.zh-cn.json','utf8'));
+          for(const [,key] of manifest.matchAll(/%([^%]+)%/g)){ assert.ok(Object.hasOwn(en,key),`missing EN ${key}`); assert.ok(Object.hasOwn(zh,key),`missing ZH ${key}`); }
+          assert.strictEqual(inferScope(['modules/wifi/wowl.c'],['wifi','motor']),'wifi');
+          const validators=createPolicyValidators((_zh,enText)=>enText);
+          assert.deepStrictEqual(validators.validateScopes(['wifi','wifi','motor'],[]),['wifi','motor']);
+          assert.throws(()=>validators.validateScopes(['BAD SCOPE'],[]));
+          const fakeConfig={ inspect(){ return { defaultValue:'codex', globalValue:'/usr/local/bin/codex', workspaceValue:'/tmp/evil' }; } };
+          assert.strictEqual(getUserOnlySetting(fakeConfig,'codexPath','codex'),'/usr/local/bin/codex');
+          const extension=fs.readFileSync('extension.js','utf8');
+          assert.doesNotMatch(extension,/\b__test\b/);
+          for(const modulePath of ['./src/ui','./src/policy','./src/repository-ui','./src/review-evidence']) assert.match(extension,new RegExp(modulePath.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+          for(const owned of ['getEffectiveOptions','getRepositories','chooseRepository','getReviewEvidence']) assert.doesNotMatch(extension,new RegExp(`function\\s+${owned}\\s*\\(`));
+          const release=fs.readFileSync(path.join('.github','workflows','release.yml'),'utf8');
+          assert.match(release,/workflow_dispatch/); assert.match(release,/Attest VSIX and checksum provenance/);
+          assert.strictEqual(pkg.main,'./dist/extension.js');
+          console.log(`Codex Commit Safe ${pkg.version} product-boundary tests passed.`);
           EOF
-          python3 - <<'PY'
+          cat > test/review-evidence.test.js <<'EOF'
+          'use strict';
+          const Module=require('module'); const original=Module._load;
+          const receipt={ schemaVersion:2, kind:'codex-review-safe', headOid:'1'.repeat(40), indexFingerprint:'2'.repeat(64), diffFingerprint:'3'.repeat(64), policyFingerprint:'<none>', stagedFileCount:1, qualityVerdict:'no_findings', readinessVerdict:'needs_evidence', mechanicalGate:'not_run', createdAt:'2026-08-22T00:00:00.000Z' };
+          let extension={ isActive:true, exports:{ getReviewReceiptStatus:()=>({status:'current',receipt}) } };
+          Module._load=function(request,parent,isMain){ if(request==='vscode') return { extensions:{ getExtension(){return extension;} } }; return original.apply(this,arguments); };
+          const assert=require('assert'); const {getReviewEvidence}=require('../src/review-evidence');
+          (async()=>{ assert.strictEqual((await getReviewEvidence('/repo',{headOid:receipt.headOid,indexFingerprint:receipt.indexFingerprint})).status,'current'); extension=undefined; assert.strictEqual((await getReviewEvidence('/repo',{})).status,'unavailable'); console.log('Review evidence adapter tests passed.'); })().catch(e=>{console.error(e);process.exit(1);});
+          EOF
+          node <<'NODE'
+          const fs=require('fs'); const pkg=require('./package.json');
+          pkg.scripts.check=pkg.scripts.check
+            .replace('node --check src/policy-validation.js && ','node --check src/policy-validation.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && ')
+            .replace('node test.js && ','node test.js && node test/review-evidence.test.js && ');
+          pkg.scripts['test:unit']=pkg.scripts['test:unit'].replace('node test.js && ','node test.js && node test/review-evidence.test.js && ');
+          fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
+          const lock=require('./package-lock.json'); lock.version=pkg.version; lock.packages[''].version=pkg.version; lock.packages[''].scripts=undefined; fs.writeFileSync('package-lock.json',JSON.stringify(lock,null,2)+'\n');
+          NODE
+          python3 <<'PY'
           from pathlib import Path
-          p=Path('scripts/verify-manifest.js')
-          s=p.read_text()
-          s=s.replace("'src/git-repository.js', 'src/commit-runtime.js', 'src/receipts.js'", "'src/git-repository.js', 'src/policy.js', 'src/commit-runtime.js', 'src/receipts.js'")
+          p=Path('scripts/verify-manifest.js'); s=p.read_text()
+          insert="""
+          for (const required of ['src/ui.js','src/policy.js','src/repository-ui.js','src/review-evidence.js']) {
+            if (!fs.existsSync(path.join(root, required))) fail(`missing production module: ${required}`);
+          }
+          const extensionSource = fs.readFileSync(path.join(root, 'extension.js'), 'utf8');
+          if (/\\b__test\\b/.test(extensionSource)) fail('extension.__test compatibility surface must not return.');
+          """
+          marker="if (pkg.main !== './dist/extension.js') fail('package main must point to dist/extension.js.');"
+          if insert.strip() not in s: s=s.replace(marker,insert+'\n'+marker)
           p.write_text(s)
           PY
           rm -f .github/workflows/finalize-commit-architecture.yml
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run check
       - run: npm run package
-      - name: Commit validated architecture
+      - name: Commit only after full validation
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'refactor!: split Commit policy orchestration from extension entry'
+          git commit -m 'refactor!: decouple Commit extension entry from product services'
           git push origin HEAD:main
