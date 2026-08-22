@@ -18,7 +18,7 @@ const repo = createGitRepository({
     if (args[0] === 'ls-files' && args[1] === '-u') return { stdout: '', stderr: '' };
     if (args[0] === 'log') return { stdout: 'fix(core): repair race\0feat(core): add guard\0chore(core): update metadata\0', stderr: '' };
     if (args[0] === 'ls-tree') return { stdout: '100644 blob deadbeef\t.codex-safe.json\0', stderr: '' };
-    if (args[0] === 'show') return { stdout: '{"schemaVersion":2,"commit":{"language":"en","styleHistoryLimit":12}}', stderr: '' };
+    if (args[0] === 'show') return { stdout: '{"schemaVersion":3,"commit":{"language":"en","styleHistoryLimit":12}}', stderr: '' };
     throw new Error(`unexpected git args: ${args.join(' ')}`);
   },
   runProcessBuffer: async () => ({ stdout: indexBytes, stderr: Buffer.alloc(0) }),
@@ -35,10 +35,7 @@ const repo = createGitRepository({
   assert.deepStrictEqual(await repo.getRepositorySnapshot('/repo'), { headOid: head, indexFingerprint: fingerprint });
   assert(repo.repositorySnapshotsEqual({ headOid: head, indexFingerprint: fingerprint }, { headOid: head, indexFingerprint: fingerprint }));
   assert(!repo.repositorySnapshotsEqual({ headOid: head, indexFingerprint: fingerprint }, { headOid: 'b'.repeat(40), indexFingerprint: fingerprint }));
-  assert.strictEqual(
-    repo.repositoryFromCommandContext([{ root: '/repo/a' }, { root: '/repo/b' }], [{ resourceUri: { fsPath: '/repo/b' } }])?.root,
-    '/repo/b'
-  );
+  assert.strictEqual(repo.repositoryFromCommandContext([{ root: '/repo/a' }, { root: '/repo/b' }], [{ resourceUri: { fsPath: '/repo/b' } }])?.root, '/repo/b');
 
   const policy = await repo.readProjectRulesAtHead('/repo', head);
   assert.deepStrictEqual(policy.rules, { language: 'en', styleHistoryLimit: 12 });
@@ -64,7 +61,7 @@ const repo = createGitRepository({
   const invalidPolicy = createGitRepository({
     runProcess: async (_command, args) => {
       if (args[0] === 'ls-tree') return { stdout: '100644 blob deadbeef\t.codex-safe.json\0', stderr: '' };
-      if (args[0] === 'show') return { stdout: '{"schemaVersion":2,"commit":{"codexPath":"evil"}}', stderr: '' };
+      if (args[0] === 'show') return { stdout: '{"schemaVersion":3,"commit":{"codexPath":"evil"}}', stderr: '' };
       throw new Error('unexpected');
     },
     runProcessBuffer: async () => ({ stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }),
