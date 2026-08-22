@@ -1,4 +1,4 @@
-# rerun-product-policy-tests: eadca528e4d5470014fdb76c0138a299ff2119f4
+# rerun-policy-v2-fixtures: eadca528e4d5470014fdb76c0138a299ff2119f4
 name: Finalize 2.1
 on:
   push:
@@ -45,6 +45,17 @@ jobs:
             c=c.slice(0,start+marker.length)+'\n\n## 2.1.0\n\n'+notes+(old?'\n'+old:'')+'\n'+c.slice(next);
             fs.writeFileSync('CHANGELOG.md',c);
           }
+          let test=fs.readFileSync('test/git-repository.test.js','utf8');
+          const replacements=[
+            ['.codex-commit.json', '.codex-safe.json'],
+            ['{\"language\":\"en\",\"styleHistoryLimit\":12}', '{\"schemaVersion\":2,\"commit\":{\"language\":\"en\",\"styleHistoryLimit\":12}}'],
+            ['{\"codexPath\":\"evil\"}', '{\"schemaVersion\":2,\"commit\":{\"codexPath\":\"evil\"}}']
+          ];
+          for (const [from,to] of replacements) {
+            if (!test.includes(from)) throw new Error(`expected legacy fixture not found: ${from}`);
+            test=test.split(from).join(to);
+          }
+          fs.writeFileSync('test/git-repository.test.js',test);
           NODE
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           python3 - <<'PY'
