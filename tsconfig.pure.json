@@ -7,12 +7,8 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "lib": [
-      "ES2022"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2022"],
+    "types": ["node"],
     "skipLibCheck": true
   },
   "include": [
@@ -21,7 +17,6 @@
     "src/policy-validation.js",
     "src/process-runner.js",
     "src/git-repository.js",
-    "src/codex-safe-core/codex-cli.d.ts",
     "src/commit-runtime.js"
   ]
 }
