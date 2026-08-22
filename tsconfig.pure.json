@@ -17,6 +17,7 @@
     "src/policy-validation.js",
     "src/process-runner.js",
     "src/git-repository.js",
-    "src/commit-runtime.js"
+    "src/commit-runtime.js",
+    "src/receipts.js"
   ]
 }
