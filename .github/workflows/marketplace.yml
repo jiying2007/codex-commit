@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Immutable release tag to publish, for example v2.1.0'
+        description: 'Immutable GitHub Release tag to publish, for example v2.1.0'
         required: true
 
 permissions:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish to VS Code Marketplace
+    name: Publish validated Release VSIX
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -37,7 +37,6 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 0
-          submodules: recursive
           persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -45,7 +44,7 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Verify release source
+      - name: Verify immutable release source
         shell: bash
         run: |
           set -euo pipefail
@@ -54,28 +53,34 @@ jobs:
           test "$(node -p "require('./package.json').name")" = "codex-commit-safe"
           npm run verify:lock
           npm ci --ignore-scripts --no-audit --no-fund
-          npm run check
 
-      - name: Build and verify Marketplace VSIX
+      - name: Download and verify GitHub Release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          npm run package
-          vsix="codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
-          test -f "$vsix"
-          unzip -Z1 "$vsix" > /tmp/vsix-files.txt
+          tag='${{ steps.release.outputs.tag }}'
+          version='${{ steps.release.outputs.version }}'
+          vsix="codex-commit-safe-${version}.vsix"
+          mkdir -p release-artifacts
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir release-artifacts --pattern "$vsix" --pattern SHA256SUMS
+          test -f "release-artifacts/$vsix"
+          test -f release-artifacts/SHA256SUMS
+          (cd release-artifacts && sha256sum -c SHA256SUMS)
+          unzip -Z1 "release-artifacts/$vsix" > /tmp/vsix-files.txt
           grep -Fx 'extension/package.nls.json' /tmp/vsix-files.txt
           grep -Fx 'extension/package.nls.zh-cn.json' /tmp/vsix-files.txt
           grep -Fx 'extension/README.zh-CN.md' /tmp/vsix-files.txt
           grep -Fx 'extension/dist/extension.js' /tmp/vsix-files.txt
           grep -Fx 'extension/dist/codex-safe.schema.json' /tmp/vsix-files.txt
           if grep -E '^extension/(extension\.js|src/|test|scripts|package-lock\.json|tsconfig[^/]*\.json|\.gitmodules|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
-            echo 'VSIX contains development-only files' >&2
+            echo 'Release VSIX contains development-only files' >&2
             exit 1
           fi
-          sha256sum "$vsix"
 
-      - name: Publish Marketplace extension
+      - name: Publish exact Release VSIX
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         shell: bash
@@ -85,5 +90,5 @@ jobs:
             echo 'VSCE_PAT is required for Marketplace publishing. Configure the repository secret before running this workflow.' >&2
             exit 1
           }
-          vsix="codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
+          vsix="release-artifacts/codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
           ./node_modules/.bin/vsce publish --packagePath "$vsix" --pat "$VSCE_PAT" --skip-duplicate
