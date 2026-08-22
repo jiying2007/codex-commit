@@ -8,9 +8,9 @@ Codex Commit Safe is the Commit stage of the **Codex Safe Git Workflow** product
 
 ```text
 Codex Review Safe
-      ↓ Review Receipt v3
+      ↓ Review Receipt v4
 Codex Commit Safe
-      ↓ Commit Receipt v3
+      ↓ Commit Receipt v4
 Codex PR Safe
       ↓ verified PR provenance
 ```
@@ -28,7 +28,7 @@ Shared safety/runtime infrastructure comes exclusively from the pinned [`codex-s
 - Validates Structured Output locally before writing the SCM input box.
 - Rejects stale results when HEAD or the raw Git index changes.
 - Consumes a matching Codex Review Safe Receipt when available.
-- Produces a pending Commit Receipt v3 tied to HEAD, index, full diff, final message, policy, and Review evidence.
+- Produces a pending Commit Receipt v4 tied to HEAD, index, full diff, final message, policy, and Review evidence.
 - Exposes verified Commit range evidence to Codex PR Safe.
 
 ## What it never does
