@@ -6,7 +6,6 @@ const {
   buildRepositoryStyleGuidance,
   clampHistoryLimit
 } = require('./commit-style');
-const { PROJECT_RULE_KEYS } = require('./policy-validation');
 const { createGitRepository: createCoreGitRepository } = require('./codex-safe-core/git-repository');
 const { POLICY_FILE, readPolicySectionAtHead } = require('./codex-safe-core/policy');
 
@@ -19,7 +18,9 @@ function createGitRepository({ runProcess, runProcessBuffer, ui }) {
     const bounded = clampHistoryLimit(limit);
     if (bounded === 0 || headOid === '<unborn>') return [];
     const subjects = await core.getRecentCommitSubjects(repoRoot, bounded, headOid, token);
-    return buildRepositoryStyleGuidance(summarizeRepositoryStyle(parseCommitSubjects(subjects.join('\0') + '\0', bounded)));
+    return buildRepositoryStyleGuidance(
+      summarizeRepositoryStyle(parseCommitSubjects(subjects.join('\0') + '\0', bounded))
+    );
   }
 
   function repositoryFromCommandContext(repositories, commandArgs) {
@@ -34,22 +35,14 @@ function createGitRepository({ runProcess, runProcessBuffer, ui }) {
     return undefined;
   }
 
-  async function readProjectRulesAtHead(repoRoot, headOid, token) {
-    const result = await readPolicySectionAtHead({
+  function readProjectRulesAtHead(repoRoot, headOid, token) {
+    return readPolicySectionAtHead({
       git: core.git,
       repoRoot,
       headOid,
       section: 'commit',
       token
     });
-    const unknown = Object.keys(result.rules).filter(key => !PROJECT_RULE_KEYS.has(key));
-    if (unknown.length) {
-      throw new Error(ui(
-        `${POLICY_FILE}.commit 包含不支持的字段：${unknown.join(', ')}。`,
-        `${POLICY_FILE}.commit contains unsupported fields: ${unknown.join(', ')}.`
-      ));
-    }
-    return result;
   }
 
   return Object.freeze({
