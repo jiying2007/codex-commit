@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const { createProcessRunner } = require('../src/process-runner');
+const { createProcessRunner } = require('../src/codex-safe-core/process-runner');
 
 const runner = createProcessRunner((_zh, en) => en);
 
@@ -29,12 +29,13 @@ const runner = createProcessRunner((_zh, en) => en);
   assert.strictEqual(bufferResult.stderr.length, 0);
 
   await assert.rejects(
-    () => runner.runProcess(
-      process.execPath,
-      ['-e', 'process.stdout.write("12345")'],
-      { timeoutMs: 5000, maxStdoutBytes: 4 }
-    ),
+    () => runner.runProcess(process.execPath, ['-e', 'process.stdout.write("12345")'], { timeoutMs: 5000, maxStdoutBytes: 4 }),
     error => error && error.code === 'EOUTPUTLIMIT'
+  );
+
+  await assert.rejects(
+    () => runner.runProcess(process.execPath, ['-e', '0'], { shell: true }),
+    error => error && error.code === 'ESHELLFORBIDDEN'
   );
 
   await assert.rejects(
@@ -51,7 +52,7 @@ const runner = createProcessRunner((_zh, en) => en);
     error => error && error.code === 'ECANCELLED'
   );
 
-  console.log('process runner tests passed.');
+  console.log('canonical Core process runner tests passed.');
 })().catch(error => {
   console.error(error);
   process.exit(1);
