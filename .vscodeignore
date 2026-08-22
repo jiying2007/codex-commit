@@ -6,13 +6,13 @@ node_modules/**
 *.zip
 test.js
 test/**
-.codex-commit.example.json
+.codex-safe.example.json
 .gitignore
 .gitattributes
+.gitmodules
 package-lock.json
 PUBLISHING.md
 scripts/**
 extension.js
 src/**
 tsconfig*.json
-safe-core.lock.json
