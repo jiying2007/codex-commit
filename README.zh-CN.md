@@ -2,266 +2,175 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-使用本地 Codex CLI，根据 VS Code 中 **Git 暂存区（staged）变更**安全生成结构化 Conventional Commit Message。
+在 VS Code 中基于 **Git 暂存区变更**生成经过本地校验的 Conventional Commit Message，同时始终由开发者掌控 Git。
 
-> **为什么叫 Safe？** 插件刻意缩小信任边界：只读取 staged changes、使用 Structured Output、校验 HEAD + Git 原始 index 指纹、防止过期结果、限制 Codex 能力、不自动 commit/push，多仓库无法可靠定位时直接 fail closed。
+Codex Commit Safe 是 **Codex Safe Git Workflow** 产品族的 Commit 阶段：
+
+```text
+Codex Review Safe
+      ↓ Review Receipt v2
+Codex Commit Safe
+      ↓ Commit Receipt v2
+Codex PR Safe
+      ↓ 可验证 PR provenance
+```
+
+所有共享安全与运行时基础设施只来自固定 commit 的 [`codex-safe-core`](https://github.com/jiying2007/codex-safe-core) Git submodule。
 
 ## 核心能力
 
-- VS Code Source Control 一键生成 Commit Message
-- **只分析 staged changes**（`git diff --cached`）
-- Commit Message 支持 **简体中文 / 英文**
-- VS Code 命令、设置、进度、警告和错误提示支持 **英文 / 简体中文**自动本地化
-- **界面语言与 Commit Message 语言相互独立**
-- 自动推断 scope，并支持项目自定义推荐 scope
-- Repository Style Intelligence：仅在本地把近期 Commit Subject 归纳为固定统计特征，不把历史提交原文发送给 Codex
-- Codex Structured Output + 本地 Schema 校验
-- 支持重新生成、取消、超时、多仓库和项目规则
-- HEAD + Git 原始 index snapshot 防止 stale result 和 TOCTOU
-- `.codex-commit.json` 固定读取 HEAD 并记录策略指纹；staged/unstaged 策略修改在提交后才生效
-- `.codex-commit.json` 提供 VS Code 原生 JSON Schema 自动补全和即时校验
-- 支持 Remote Development：扩展运行在工作区侧，`codexPath` 使用 machine scope，本地与远程可分别指定 Codex CLI
-- 可选显示精确 HEAD/index staged 快照对应的 Codex Review Safe 凭据状态；缺失或过期凭据不会触发自动提交
-- CI 覆盖 Windows `.exe/.cmd/.bat`、Linux、macOS
-- 永远不会自动 commit、push 或修改项目源码
+- 只读取 staged changes。
+- 生成 `type(scope): description` Conventional Commit Message。
+- 支持简体中文和英文输出。
+- 在调用 Codex 前先进行确定性 scope 推断。
+- 近期仓库提交风格只在本地归纳为统计特征，不把历史 Commit 原文发送给 Codex。
+- 使用 Safe Core Semantic Context Budget，不再做“取前 N 字节”的粗暴截断。
+- Structured Output 必须经过本地 schema 和语义校验后才写入 SCM 输入框。
+- HEAD 或 Git 原始 index 变化时丢弃 stale result。
+- 如果存在匹配的 Codex Review Safe Receipt，则纳入 Commit provenance。
+- 生成与 HEAD、index、完整 diff、最终 message、policy、Review evidence 绑定的 pending Commit Receipt v2。
+- 向 Codex PR Safe 暴露经过重新验证的 Commit range evidence。
 
-## 中英文支持
+## 明确不会做的事
 
-界面语言自动跟随 VS Code：
+- 不自动执行 `git commit`。
+- 不自动 push。
+- 不修改项目源码。
+- 不给 Codex Shell 权限。
+- 不给 Codex 网络/Web Search 权限。
+- 不信任 AI 输出，所有输出都必须本地校验。
 
-- 英文 VS Code → 英文命令和提示
-- 简体中文 VS Code → 中文命令和提示
+## 安全边界
 
-生成的 Commit Message 语言单独通过设置控制：
+Codex 执行采用 fail-closed。固定的 Safe Core v2 contract 要求 CLI 具备：
+
+- `--ask-for-approval never`
+- `exec --json`
+- ephemeral execution
+- 本次请求忽略用户/项目 Codex rules
+- read-only sandbox
+- Structured Output schema
+- 显式关闭 shell、unified exec、web search、apps、hooks、memories、multi-agent 等无关能力
+
+如果当前 Codex CLI 缺少必要安全能力，直接拒绝生成并要求升级；**不存在 legacy 参数 fallback**。
+
+完整 staged diff 用于本地 fingerprint 和 provenance；模型输入单独经过 Safe Core Semantic Context Budget：
+
+- source 文件公平分配预算；
+- generated/lock 文件只保留元数据；
+- binary 文件只保留元数据；
+- 过大的 source 文件保留受控的头尾上下文；
+- 原始 staged diff 固定 8 MiB 安全上限。
+
+## 唯一仓库策略文件
+
+仓库只认 `.codex-safe.json`，且必须使用 `schemaVersion: 2`。
 
 ```json
 {
-  "safeCodexCommit.language": "zh-CN"
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/d49dc356824b984166e81e42bb5f9d7abfb90099/codex-safe.schema.json",
+  "schemaVersion": 2,
+  "commit": {
+    "language": "zh-CN",
+    "maxDiffBytes": 262144,
+    "subjectMaxLength": 72,
+    "maxBodyChars": 2000,
+    "scopes": ["bsp", "driver", "wifi", "audio", "motor", "imu", "ota", "mcu", "nand", "power", "camera", "system"],
+    "scopePolicy": "flexible",
+    "autoInferScope": true,
+    "styleHistoryLimit": 12,
+    "scopeHints": {
+      "power": ["low power", "suspend", "resume", "wakeup"],
+      "camera": ["isp", "venc", "mipi"]
+    },
+    "extraInstructions": "修复缺陷优先使用 fix，新增功能使用 feat。",
+    "timeoutSeconds": 90
+  }
 }
 ```
 
-或：
+只使用 **HEAD 中已提交的策略**。working-tree 或 staged 中对策略的修改不会影响描述该修改自身的 Commit Message，而是在提交后生效。
 
-```json
-{
-  "safeCodexCommit.language": "en"
-}
-```
+仓库策略不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 为 machine scope，`safeCodexCommit.model` 为 application scope。
 
-因此可以：
+`maxDiffBytes` 表示**模型 Semantic Context 预算**，不是原始 diff 的拒绝阈值。
 
-- 中文 VS Code + 英文 Commit Message；
-- 英文 VS Code + 中文 Commit Message。
+## Review → Commit provenance
 
-示例：
+当 Codex Review Safe 对当前精确 staged snapshot 存在有效 Receipt v2 时，Commit Safe 会把该 Review Receipt 的 fingerprint 写入 Commit Receipt。
 
-```text
-fix(wifi): 修复 WOWL 唤醒配置异常
-```
+用户依然手工提交。Commit Safe 不依赖“点击 Commit 按钮”这种 UI 事件来证明提交来源。Codex PR Safe 查询 range evidence 时，Commit Safe 会重新计算每个 first-parent commit 的：
 
-```text
-fix(wifi): fix WOWL wake configuration
-```
+- parent HEAD；
+- 完整 commit diff；
+- 最终 Git commit message。
 
-## 工作流程
+只有三类 fingerprint 与 pending Commit Receipt 完全匹配，才绑定真实 `commitOid`。
 
-```text
-Stage changes
-    ↓
-VS Code Source Control
-    ↓
-Codex Commit Safe
-    ↓
-本地 Codex CLI
-    ↓
-Structured result
-    ↓
-本地校验 Conventional Commit
-    ↓
-写入 SCM Commit 输入框
-```
+因此，只要用户修改 Commit Message、提交内容或父提交，provenance 会自动失效。
 
-## 安全模型
+## 使用
 
-Codex Commit Safe 有意保持较小的执行边界：
+1. Stage 准备提交的修改。
+2. 打开 **Source Control**。
+3. 执行 **Codex Commit Safe: 生成 Commit Message**。
+4. 人工检查，必要时重新生成。
+5. 手工提交。
 
-- 只把 staged diff 用于变更推理；启用仓库风格学习时，近期 Commit Subject 只在本地归纳为固定统计特征，历史提交原文不会发送给 Codex；
-- Codex 在临时目录运行，而不是在源码仓库运行；
-- 生成请求忽略用户 Codex config 和项目 execution rules；
-- 在 CLI 支持的范围内显式关闭不需要的执行、Shell、Web、App、Agent、Hook、Memory 等能力；
-- 使用 read-only sandbox，并禁止 approval；
-- 生成结果必须通过严格的本地 schema 和内容校验；
-- 仓库状态由 **HEAD OID + SHA-256(raw `git ls-files --stage -z`)** 表示；
-- 输入采集前后、写入前都会重新校验 snapshot；
-- 新生成请求会让旧请求失效，旧结果不会覆盖新结果；
-- 多仓库无法可靠确定 SCM 输入框时拒绝写入；
-- Output Channel 不记录源码、staged diff、生成的 Commit Message 或仓库绝对路径。
-
-企业受管 Codex requirements、MDM、managed hooks 和云端策略仍可能生效，插件不会尝试绕过组织策略。
-
-> staged diff 会发送到配置的 Codex 服务进行推理。仅在符合公司源码和数据安全政策时使用。
-
-更多信息见 [SECURITY.md](SECURITY.md)。
+可执行 **Codex Commit Safe: 检查 Codex 环境** 验证 Git、Codex executable 以及必需 CLI capability。
 
 ## 环境要求
 
 - VS Code `1.90.0` 或更高版本
 - Git
-- 已安装并登录 OpenAI Codex CLI
+- 在工作区 Extension Host 所在环境安装并登录 OpenAI Codex CLI
 
-先确认：
+Remote SSH、Dev Containers、Codespaces、WSL 场景下，应在对应远端环境配置 `safeCodexCommit.codexPath`。
 
-```bash
-codex --version
-```
-
-使用 VS Code Remote Development（SSH、Dev Containers、Codespaces 或 WSL）时，需要在**工作区 Extension Host 所在环境**安装并登录 Codex CLI。`safeCodexCommit.codexPath` 为 machine scope，因此远端路径可以和本机 VS Code 不同。
-
-## 安装
-
-从 GitHub Release 下载 VSIX：
+## 构建与测试
 
 ```bash
-code --install-extension codex-commit-safe-<version>.vsix
-```
-
-或者在 VS Code 中：
-
-```text
-Extensions → ... → Install from VSIX...
-```
-
-安装后执行：
-
-```text
-Ctrl+Shift+P → Codex Commit Safe: 检查 Codex 环境
-```
-
-## 使用
-
-1. Stage 本次准备提交的修改。
-2. 打开 **Source Control**。
-3. 点击工具栏按钮或执行 **Codex Commit Safe: 生成 Commit Message**。
-4. 人工检查生成结果。
-5. 手工提交。
-
-需要另一种表达时执行 **重新生成 Commit Message**。
-
-## 项目配置
-
-仓库可以添加 `.codex-commit.json`：
-
-```json
-{
-  "language": "zh-CN",
-  "subjectMaxLength": 72,
-  "maxDiffBytes": 262144,
-  "maxBodyChars": 2000,
-  "scopes": [
-    "bsp",
-    "driver",
-    "wifi",
-    "audio",
-    "motor",
-    "imu",
-    "ota",
-    "mcu",
-    "nand",
-    "power",
-    "camera",
-    "system"
-  ],
-  "autoInferScope": true,
-  "styleHistoryLimit": 12,
-  "scopeHints": {
-    "power": ["low power", "suspend", "resume", "wakeup"],
-    "camera": ["isp", "venc", "mipi"]
-  },
-  "scopePolicy": "flexible",
-  "extraInstructions": "修复缺陷优先使用 fix；新增功能使用 feat；一次提交只表达一个逻辑目的。",
-  "timeoutSeconds": 90
-}
-```
-
-VS Code 会使用插件内置的 `schemas/codex-commit.schema.json` 对配置进行自动补全和即时诊断，提前发现未知字段、类型错误和越界数值；运行时仍会继续执行 fail-closed 校验，并以运行时规则为最终准入标准。
-
-插件只使用 **HEAD** 中已提交的配置。working-tree 或 staged 策略修改不会影响描述其自身提交的 Commit Message，而是在提交后生效。`styleHistoryLimit` 控制本地统计多少条近期 Commit Subject；设为 `0` 可关闭风格学习。历史 Subject 原文不会进入 Codex Prompt。
-
-项目规则不能配置 Codex 可执行文件、模型、环境变量、工作目录或任意命令。`safeCodexCommit.codexPath` 为 machine scope，`safeCodexCommit.model` 为 application scope，两者都不能被仓库策略覆盖。启用 `autoInferScope` 后，scope 推荐会同时参考 staged 路径和 changed diff 语义；通用文件名不会单独强推业务 scope，低置信度或冲突证据交由 Codex 根据完整 diff 判断。
-
-Scope 推断会按文件综合 staged 路径、hunk/函数上下文、新增代码，以及较低权重的删除代码；低置信度或多子系统证据接近时会故意不提供 preferred scope，让 Codex 根据完整 diff 判断。`scopeHints` 可补充项目自己的静态语义别名，提示词不会被执行。`scopePolicy` 默认 `flexible`；只有需要强制非空 scope 必须属于已配置 `scopes` 时才设置为 `strict`。
-
-## 扩展身份
-
-- Extension name：`codex-commit-safe`
-- Display name：**Codex Commit Safe**
-- Publisher / VSIX ID：`jiying2007.codex-commit-safe`
-- 命令/设置 namespace：`safeCodexCommit.*`
-- Marketplace：**暂未发布**，当前正式分发渠道为 GitHub Releases
-
-## 开发与验证
-
-安装锁定依赖：
-
-```bash
-npm ci --ignore-scripts
-```
-
-语法 + 单元/回归 + manifest/schema 检查：
-
-```bash
+git submodule update --init --recursive
+npm ci --ignore-scripts --no-audit --no-fund
 npm run check
-```
-
-Extension Host 集成测试：
-
-```bash
 npm run test:integration
-```
-
-生产 Bundle 与官方 VSIX 打包：
-
-```bash
-npm run build
 npm run package
 ```
 
-Marketplace/Release 最终加载由固定版本 esbuild 生成的 `dist/extension.js`；源码模块和开发脚本不会进入 VSIX。
+Marketplace / Release 运行入口统一为 `dist/extension.js`。VSIX 只包含生产运行时与 `dist/codex-safe.schema.json`；源码、tests、scripts、submodule metadata 一旦进入 VSIX，CI 会直接失败。
 
-GitHub Actions 还会验证：
+CI 门禁包括：
 
-- Ubuntu / Windows / macOS 最新 VS Code；
-- Ubuntu 上最低支持版本 VS Code `1.90.0`；
-- 官方 VSIX 内容和 SHA-256。
+- static/type/contract；
+- unit/regression；
+- Linux / Windows / macOS Extension Host；
+- 最低 VS Code `1.90.0`；
+- 官方 VSIX 边界审计；
+- SHA-256。
 
-## 发布门禁
+## 发布完整性
 
-将已提交的版本号更新合入 `main` 后，会自动运行完整发布门禁。全部 job 通过后，workflow 会在同一次运行中创建不可变的 `v<package.version>` Tag 并发布 GitHub Release。未修改版本号的普通 `main` push 不会发布；推送匹配的 `vMAJOR.MINOR.PATCH` Tag 仍作为人工回退入口。
+`main` 上的版本变更会触发完整 Release gate。全部验证和集成测试通过后，才创建不可变 Tag 与 GitHub Release。
 
-推荐的本地发布入口：
+发布资产包括：
 
-```bash
-npm run release:prepare -- X.Y.Z
-git diff --check
-git diff
-npm run release:check
-npm run release:push
-```
+- `codex-commit-safe-<version>.vsix`
+- `SHA256SUMS`
+- 两个资产对应的 GitHub build-provenance attestation
 
-`release:prepare` 只修改 `package.json`、`package-lock.json` 和 `CHANGELOG.md`；`release:check` 要求本地 `main` 已与远端同步、只存在这三个未暂存修改、远端 tag 未占用，并完整通过 lock、测试和 VSIX 打包门禁。`release:push` 会再次执行完整门禁，创建 release commit，push `main`，并等待该精确 commit 对应的 Release workflow、不可变 tag、已发布 Release、VSIX 和 `SHA256SUMS` 全部闭环；不会创建或强制移动本地 tag。三个命令都支持 `--dry-run`；`release:push` 还支持 `--timeout-minutes N`。可选环境变量 `CODEX_RELEASE_GITHUB_TOKEN` 仅用于 API 轮询鉴权，禁止提交到仓库。
+只有最终 Release job 拥有 `contents: write`、`id-token: write`、`attestations: write`；其余验证 job 均只读。GitHub Actions 使用完整 commit SHA 固定。
 
-`vMAJOR.MINOR.PATCH` tag 必须：
+详见 [PUBLISHING.md](PUBLISHING.md) 与 [SECURITY.md](SECURITY.md)。
 
-- 与 `package.json.version` 完全一致；
-- 指向 `main` 可达的提交；
-- 单元/回归测试通过；
-- Linux / Windows / macOS 最新 VS Code Extension Host 通过；
-- VS Code `1.90.0` 最低版本兼容通过；
-- 官方 `vsce` 打包通过。
+## 产品族边界
 
-只有最终 Release job 拥有 `contents: write`，所有验证 job 都是只读权限。
+| 产品 | 职责 | 明确不做 |
+| --- | --- | --- |
+| Codex Review Safe | staged change 质量门禁 | 写代码 / commit |
+| **Codex Commit Safe** | Commit Message + 可验证 Commit Receipt | commit / push |
+| Codex PR Safe | PR narrative + provenance | push / 自动提交 PR |
 
-完整发布 Runbook、失败恢复和包边界见 [PUBLISHING.md](PUBLISHING.md)。
+设计原则：**AI 辅助 Git 工作流，但不把 Git 控制权交给 AI。**
 
 ## License
 
