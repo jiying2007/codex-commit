@@ -4,6 +4,8 @@
 node_modules/**
 *.vsix
 *.zip
+extension.js
+src/**
 test.js
 test/**
 .codex-safe.example.json
@@ -13,9 +15,4 @@ test/**
 package-lock.json
 PUBLISHING.md
 scripts/**
-extension.js
-src/**
-!src/codex-safe-core/
-src/codex-safe-core/**
-!src/codex-safe-core/codex-safe.schema.json
 tsconfig*.json
