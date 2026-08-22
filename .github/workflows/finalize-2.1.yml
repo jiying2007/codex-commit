@@ -1,4 +1,4 @@
-# rerun-frozen-core: eadca528e4d5470014fdb76c0138a299ff2119f4
+# rerun-js-gate: eadca528e4d5470014fdb76c0138a299ff2119f4
 name: Finalize 2.1
 on:
   push:
@@ -29,10 +29,8 @@ jobs:
           const fs=require('fs');
           const version='2.1.0';
           const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
-          const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
-          pkg.version=version; lock.version=version; lock.packages[''].version=version;
+          pkg.version=version;
           fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
-          fs.writeFileSync('package-lock.json',JSON.stringify(lock,null,2)+'\n');
           let c=fs.readFileSync('CHANGELOG.md','utf8');
           if(!c.includes('\n## 2.1.0\n')){
             const marker='## Unreleased'; const start=c.indexOf(marker); const next=c.indexOf('\n## ',start+marker.length);
@@ -42,12 +40,13 @@ jobs:
               '- Pin Codex Safe Core 2.1 as the canonical policy/process/Git/context/contract runtime.',
               '- Split Commit UI, repository selection, policy merge, and Review-evidence adapters out of the extension entry; remove the extension.__test compatibility surface.',
               '- Fix Commit Receipt diff fingerprint generation to await the async Core fingerprint helper.',
-              '- Remove redundant product process-runner proxy/tests and keep process semantics exclusively in Safe Core.'
+              '- Remove redundant product process-runner proxy/tests and the stale TypeScript checkJs dual-track; validate the JavaScript runtime through syntax, production-module, Extension Host, bundle and VSIX gates.'
             ].join('\n');
             c=c.slice(0,start+marker.length)+'\n\n## 2.1.0\n\n'+notes+(old?'\n'+old:'')+'\n'+c.slice(next);
             fs.writeFileSync('CHANGELOG.md',c);
           }
           NODE
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           python3 - <<'PY'
           from pathlib import Path
           p=Path('.github/workflows/ci.yml'); s=p.read_text()
