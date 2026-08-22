@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Git tag to publish, for example v1.2.3'
+        description: 'Immutable release tag to publish, for example v2.1.0'
         required: true
 
 permissions:
@@ -37,6 +37,7 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 0
+          submodules: recursive
           persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -67,8 +68,8 @@ jobs:
           grep -Fx 'extension/package.nls.zh-cn.json' /tmp/vsix-files.txt
           grep -Fx 'extension/README.zh-CN.md' /tmp/vsix-files.txt
           grep -Fx 'extension/dist/extension.js' /tmp/vsix-files.txt
-          grep -Fx 'extension/schemas/codex-commit.schema.json' /tmp/vsix-files.txt
-          if grep -E '^extension/(extension\.js|src/|test|scripts|package-lock\.json|tsconfig[^/]*\.json|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
+          grep -Fx 'extension/dist/codex-safe.schema.json' /tmp/vsix-files.txt
+          if grep -E '^extension/(extension\.js|src/|test|scripts|package-lock\.json|tsconfig[^/]*\.json|\.gitmodules|\.gitignore|\.gitattributes)' /tmp/vsix-files.txt; then
             echo 'VSIX contains development-only files' >&2
             exit 1
           fi
