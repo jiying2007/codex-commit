@@ -6,7 +6,7 @@ const {
   validateCommitReceipt
 } = require('./codex-safe-core/safe-contract');
 
-const RECEIPT_STORAGE_KEY = 'safeCodexCommit.receipts.v3';
+const RECEIPT_STORAGE_KEY = 'safeCodexCommit.receipts.v4';
 const MAX_RECEIPTS_PER_REPO = 100;
 
 function normalizeCommitMessage(value) {
@@ -33,7 +33,7 @@ function createCommitReceiptStore(globalState, { git, normalizeFsPath, fingerpri
   }
   async function persistPending(repoRoot, receipt) {
     const pending = validateCommitReceipt({ ...receipt, commitOid: '<pending>' });
-    if (!pending) throw new Error('Commit receipt is invalid and was not stored.');
+    if (!pending) throw new Error('Commit Receipt v4 is invalid and was not stored.');
     const key = normalizeFsPath(repoRoot);
     const receipts = [pending, ...(receiptsByRepo.get(key) || [])].filter((item, index, all) => all.findIndex(other =>
       other.headOid === item.headOid && other.indexFingerprint === item.indexFingerprint && other.diffFingerprint === item.diffFingerprint && other.messageFingerprint === item.messageFingerprint && other.policyFingerprint === item.policyFingerprint
