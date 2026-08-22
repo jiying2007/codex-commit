@@ -15,52 +15,32 @@ function fail(message) {
   process.exit(2);
 }
 
-if (SAFE_CORE_VERSION !== 2 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 2) {
-  fail('Codex Safe Core v2 contract is required.');
-}
-
+if (SAFE_CORE_VERSION !== 2 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 2) fail('Codex Safe Core v2 contract is required.');
 if (!fs.existsSync(schemaPath)) fail('canonical Codex Safe schema is missing from the Core submodule.');
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
 const commitSchema = schema.properties?.commit;
 if (!commitSchema || commitSchema.additionalProperties !== false) fail('canonical commit policy schema must fail closed.');
 
 const expectedProjectKeys = [
-  'language',
-  'subjectMaxLength',
-  'maxDiffBytes',
-  'maxBodyChars',
-  'scopes',
-  'scopeHints',
-  'scopePolicy',
-  'autoInferScope',
-  'extraInstructions',
-  'timeoutSeconds',
-  'styleHistoryLimit'
+  'language', 'subjectMaxLength', 'maxDiffBytes', 'maxBodyChars', 'scopes', 'scopeHints',
+  'scopePolicy', 'autoInferScope', 'extraInstructions', 'timeoutSeconds', 'styleHistoryLimit'
 ].sort();
 const schemaKeys = Object.keys(commitSchema.properties || {}).sort();
-if (JSON.stringify(schemaKeys) !== JSON.stringify(expectedProjectKeys)) {
-  fail(`canonical commit policy schema keys drifted: ${JSON.stringify(schemaKeys)}`);
-}
+if (JSON.stringify(schemaKeys) !== JSON.stringify(expectedProjectKeys)) fail(`canonical commit policy schema keys drifted: ${JSON.stringify(schemaKeys)}`);
 const runtimeProjectKeys = [...PROJECT_RULE_KEYS].sort();
-if (JSON.stringify(runtimeProjectKeys) !== JSON.stringify(expectedProjectKeys)) {
-  fail(`PROJECT_RULE_KEYS drifted from the canonical schema: ${JSON.stringify(runtimeProjectKeys)}`);
-}
+if (JSON.stringify(runtimeProjectKeys) !== JSON.stringify(expectedProjectKeys)) fail(`PROJECT_RULE_KEYS drifted from the canonical schema: ${JSON.stringify(runtimeProjectKeys)}`);
 
 const validation = (pkg.contributes?.jsonValidation || []).find(item => item.fileMatch === '.codex-safe.json');
 if (!validation) fail('package.json must register jsonValidation for .codex-safe.json.');
-if (validation.url !== './src/codex-safe-core/codex-safe.schema.json') fail(`unexpected canonical schema URL: ${validation.url}`);
+if (validation.url !== './dist/codex-safe.schema.json') fail(`unexpected dist schema URL: ${validation.url}`);
 
 const gitmodules = fs.readFileSync(path.join(root, '.gitmodules'), 'utf8');
-if (!gitmodules.includes('path = src/codex-safe-core') || !gitmodules.includes('url = https://github.com/jiying2007/codex-safe-core.git')) {
-  fail('.gitmodules must point only at the canonical Codex Safe Core repository.');
-}
+if (!gitmodules.includes('path = src/codex-safe-core') || !gitmodules.includes('url = https://github.com/jiying2007/codex-safe-core.git')) fail('.gitmodules must point only at the canonical Codex Safe Core repository.');
 if (/\bbranch\s*=/.test(gitmodules)) fail('Codex Safe Core submodule must be commit-pinned, not branch-tracking.');
 const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'], { cwd: root, encoding: 'utf8' }).trim();
-if (!/^160000 [0-9a-f]{40,64} 0\tsrc\/codex-safe-core$/i.test(staged)) {
-  fail('src/codex-safe-core must be a Git submodule gitlink.');
-}
+if (!/^160000 [0-9a-f]{40,64} 0\tsrc\/codex-safe-core$/i.test(staged)) fail('src/codex-safe-core must be a Git submodule gitlink.');
 
-if (pkg.main !== './dist/extension.js') fail('package main must point to the bundled dist/extension.js entry.');
+if (pkg.main !== './dist/extension.js') fail('package main must point to dist/extension.js.');
 if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exactly to 0.28.2.');
 if (pkg.devDependencies?.typescript !== '7.0.2') fail('TypeScript must be pinned exactly to 7.0.2.');
 if (pkg.devDependencies?.['@types/node'] !== '26.2.0') fail('@types/node must be pinned exactly to 26.2.0.');
@@ -68,20 +48,18 @@ if (pkg.scripts?.['check:types'] !== 'tsc -p tsconfig.pure.json') fail('check:ty
 
 const typecheckConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.pure.json'), 'utf8'));
 for (const requiredModule of [
-  'src/commit-style.js',
-  'src/scope-intelligence.js',
-  'src/policy-validation.js',
-  'src/process-runner.js',
-  'src/git-repository.js',
-  'src/commit-runtime.js'
+  'src/commit-style.js', 'src/scope-intelligence.js', 'src/policy-validation.js',
+  'src/process-runner.js', 'src/git-repository.js', 'src/commit-runtime.js', 'src/receipts.js'
 ]) {
   if (!(typecheckConfig.include || []).includes(requiredModule)) fail(`strict TypeScript gate must include ${requiredModule}`);
 }
 
-if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) {
-  fail('extensionKind must be ["workspace"] so Git and Codex execute beside the workspace in Remote Development.');
+if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) fail('extensionKind must be ["workspace"].');
+const properties = pkg.contributes?.configuration?.properties || {};
+if (properties['safeCodexCommit.codexPath']?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
+for (const [key, value] of Object.entries(properties)) {
+  if (key === 'safeCodexCommit.codexPath') continue;
+  if (value.scope !== 'application') fail(`${key} must use application scope.`);
 }
-const codexPath = pkg.contributes?.configuration?.properties?.['safeCodexCommit.codexPath'];
-if (codexPath?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
 
-console.log('Codex Commit Safe manifest, Core gitlink, and v2 repository policy verified.');
+console.log('Codex Commit Safe manifest, dist boundary, Core gitlink, v2 policy, and provenance gate verified.');
