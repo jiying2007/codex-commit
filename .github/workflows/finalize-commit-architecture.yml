@@ -1,0 +1,85 @@
+name: Finalize Commit Architecture
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/finalize-commit-architecture.yml']
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Refactor Commit orchestration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('fs');
+          let ext=fs.readFileSync('extension.js','utf8');
+          const begin=ext.indexOf('function getUserOnlySetting');
+          const end=ext.indexOf('async function setCommitInput');
+          if(begin<0||end<0||end<=begin) throw new Error('policy block not found');
+          const policyBlock=ext.slice(begin,end);
+          const helperNames=['getUserOnlySetting','getEffectiveOptions'];
+          let policy="'use strict';\n\nconst vscode=require('vscode');\nconst { fingerprintPolicy }=require('./codex-safe-core/safe-contract');\nconst { createPolicyValidators }=require('./policy-validation');\nconst { createGitRepository }=require('./git-repository');\nconst { createProcessRunner }=require('./codex-safe-core/process-runner');\n\n";
+          policy += policyBlock;
+          policy += '\nmodule.exports={ getUserOnlySetting, getEffectiveOptions };\n';
+          fs.writeFileSync('src/policy.js',policy);
+          ext=ext.slice(0,begin)+ext.slice(end);
+          ext=ext.replace("const { createPolicyValidators } = require('./src/policy-validation');\n",'');
+          ext=ext.replace(/const \{\n  clampNumber,[\s\S]*?\} = createPolicyValidators\(ui\);\n\n/,'');
+          ext=ext.replace("const { createGitRepository } = require('./src/git-repository');\n","const { createGitRepository } = require('./src/git-repository');\nconst { getEffectiveOptions } = require('./src/policy');\n");
+          fs.writeFileSync('extension.js',ext);
+          NODE
+          node <<'NODE'
+          const fs=require('fs');
+          const pkg=require('./package.json');
+          pkg.scripts.check=pkg.scripts.check.replace('node --check src/policy-validation.js && ','node --check src/policy-validation.js && node --check src/policy.js && ');
+          pkg.scripts['test:unit']=pkg.scripts['test:unit'].replace('node test/policy-validation.test.js && ','node test/policy-validation.test.js && node test/policy.test.js && ');
+          fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
+          const lock=require('./package-lock.json'); lock.packages[''].version=pkg.version; lock.version=pkg.version; fs.writeFileSync('package-lock.json',JSON.stringify(lock,null,2)+'\n');
+          let ts=JSON.parse(fs.readFileSync('tsconfig.pure.json','utf8')); if(!ts.include.includes('src/policy.js')) ts.include.push('src/policy.js'); fs.writeFileSync('tsconfig.pure.json',JSON.stringify(ts,null,2)+'\n');
+          NODE
+          cat > test/policy.test.js <<'EOF'
+          'use strict';
+          const assert=require('assert');
+          const Module=require('module');
+          const original=Module._load;
+          Module._load=function(request,parent,isMain){
+            if(request==='vscode') return { workspace:{ getConfiguration(){ return { inspect(){return undefined;}, get(_k,v){return v;} }; } }, Uri:{file:x=>({fsPath:x})} };
+            return original.apply(this,arguments);
+          };
+          const policy=require('../src/policy');
+          assert.strictEqual(typeof policy.getEffectiveOptions,'function');
+          assert.strictEqual(typeof policy.getUserOnlySetting,'function');
+          console.log('Commit policy module tests passed.');
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/verify-manifest.js')
+          s=p.read_text()
+          s=s.replace("'src/git-repository.js', 'src/commit-runtime.js', 'src/receipts.js'", "'src/git-repository.js', 'src/policy.js', 'src/commit-runtime.js', 'src/receipts.js'")
+          p.write_text(s)
+          PY
+          rm -f .github/workflows/finalize-commit-architecture.yml
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run check
+      - run: npm run package
+      - name: Commit validated architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor!: split Commit policy orchestration from extension entry'
+          git push origin HEAD:main
