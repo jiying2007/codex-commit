@@ -26,32 +26,30 @@
       { "command": "safeCodexCommit.checkEnvironment", "title": "%command.checkEnvironment.title%", "category": "Codex Commit Safe", "icon": "$(check)" }
     ],
     "menus": {
-      "scm/title": [
-        { "command": "safeCodexCommit.generate", "when": "scmProvider == git && isWorkspaceTrusted", "group": "navigation@5" }
-      ],
+      "scm/title": [{ "command": "safeCodexCommit.generate", "when": "scmProvider == git && isWorkspaceTrusted", "group": "navigation@5" }],
       "commandPalette": [
         { "command": "safeCodexCommit.generate", "when": "workspaceFolderCount > 0 && isWorkspaceTrusted" },
         { "command": "safeCodexCommit.regenerate", "when": "workspaceFolderCount > 0 && isWorkspaceTrusted" },
         { "command": "safeCodexCommit.checkEnvironment", "when": "isWorkspaceTrusted" }
       ]
     },
-    "jsonValidation": [{ "fileMatch": ".codex-safe.json", "url": "./src/codex-safe-core/codex-safe.schema.json" }],
+    "jsonValidation": [{ "fileMatch": ".codex-safe.json", "url": "./dist/codex-safe.schema.json" }],
     "configuration": {
       "title": "Codex Commit Safe",
       "properties": {
         "safeCodexCommit.codexPath": { "type": "string", "default": "codex", "scope": "machine", "description": "%config.codexPath%" },
         "safeCodexCommit.model": { "type": "string", "default": "", "scope": "application", "description": "%config.model%" },
-        "safeCodexCommit.language": { "type": "string", "enum": ["zh-CN", "en"], "default": "zh-CN", "description": "%config.language%", "enumDescriptions": ["%config.language.zhCN%", "%config.language.en%"] },
-        "safeCodexCommit.maxDiffBytes": { "type": "number", "default": 262144, "minimum": 4096, "maximum": 2097152, "description": "%config.maxDiffBytes%" },
-        "safeCodexCommit.subjectMaxLength": { "type": "number", "default": 72, "minimum": 30, "maximum": 120, "description": "%config.subjectMaxLength%" },
-        "safeCodexCommit.maxBodyChars": { "type": "number", "default": 2000, "minimum": 200, "maximum": 10000, "description": "%config.maxBodyChars%" },
-        "safeCodexCommit.scopes": { "type": "array", "items": { "type": "string" }, "default": ["bsp", "driver", "wifi", "audio", "motor", "imu", "ota", "mcu", "nand", "power", "camera", "system"], "description": "%config.scopes%" },
-        "safeCodexCommit.scopeHints": { "type": "object", "default": {}, "additionalProperties": { "type": "array", "maxItems": 32, "items": { "type": "string" } }, "description": "%config.scopeHints%" },
-        "safeCodexCommit.scopePolicy": { "type": "string", "enum": ["flexible", "strict"], "default": "flexible", "description": "%config.scopePolicy%", "enumDescriptions": ["%config.scopePolicy.flexible%", "%config.scopePolicy.strict%"] },
-        "safeCodexCommit.autoInferScope": { "type": "boolean", "default": true, "description": "%config.autoInferScope%" },
-        "safeCodexCommit.styleHistoryLimit": { "type": "number", "default": 12, "minimum": 0, "maximum": 50, "description": "%config.styleHistoryLimit%" },
-        "safeCodexCommit.extraInstructions": { "type": "string", "default": "", "description": "%config.extraInstructions%" },
-        "safeCodexCommit.timeoutSeconds": { "type": "number", "default": 90, "minimum": 10, "maximum": 300, "description": "%config.timeoutSeconds%" }
+        "safeCodexCommit.language": { "type": "string", "enum": ["zh-CN", "en"], "default": "zh-CN", "scope": "application", "description": "%config.language%", "enumDescriptions": ["%config.language.zhCN%", "%config.language.en%"] },
+        "safeCodexCommit.maxDiffBytes": { "type": "number", "default": 262144, "minimum": 4096, "maximum": 2097152, "scope": "application", "description": "%config.maxDiffBytes%" },
+        "safeCodexCommit.subjectMaxLength": { "type": "number", "default": 72, "minimum": 30, "maximum": 120, "scope": "application", "description": "%config.subjectMaxLength%" },
+        "safeCodexCommit.maxBodyChars": { "type": "number", "default": 2000, "minimum": 200, "maximum": 10000, "scope": "application", "description": "%config.maxBodyChars%" },
+        "safeCodexCommit.scopes": { "type": "array", "items": { "type": "string" }, "default": ["bsp", "driver", "wifi", "audio", "motor", "imu", "ota", "mcu", "nand", "power", "camera", "system"], "scope": "application", "description": "%config.scopes%" },
+        "safeCodexCommit.scopeHints": { "type": "object", "default": {}, "scope": "application", "additionalProperties": { "type": "array", "maxItems": 32, "items": { "type": "string" } }, "description": "%config.scopeHints%" },
+        "safeCodexCommit.scopePolicy": { "type": "string", "enum": ["flexible", "strict"], "default": "flexible", "scope": "application", "description": "%config.scopePolicy%", "enumDescriptions": ["%config.scopePolicy.flexible%", "%config.scopePolicy.strict%"] },
+        "safeCodexCommit.autoInferScope": { "type": "boolean", "default": true, "scope": "application", "description": "%config.autoInferScope%" },
+        "safeCodexCommit.styleHistoryLimit": { "type": "number", "default": 12, "minimum": 0, "maximum": 50, "scope": "application", "description": "%config.styleHistoryLimit%" },
+        "safeCodexCommit.extraInstructions": { "type": "string", "default": "", "scope": "application", "description": "%config.extraInstructions%" },
+        "safeCodexCommit.timeoutSeconds": { "type": "number", "default": 90, "minimum": 10, "maximum": 300, "scope": "application", "description": "%config.timeoutSeconds%" }
       }
     }
   },
