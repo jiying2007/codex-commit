@@ -15,4 +15,7 @@ PUBLISHING.md
 scripts/**
 extension.js
 src/**
+!src/codex-safe-core/
+src/codex-safe-core/**
+!src/codex-safe-core/codex-safe.schema.json
 tsconfig*.json
