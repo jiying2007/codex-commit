@@ -1,0 +1,52 @@
+name: Apply v4.0.2 runtime hygiene
+
+on:
+  push:
+    branches: [v4.0.2-runtime-hygiene]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: v4.0.2-runtime-hygiene
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Remove stale runtime version labels and prepare 4.0.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('fs');
+          let runtime=fs.readFileSync('src/commit-runtime.js','utf8');
+          const stale='Safe Core v2 does not expose the expected Codex/context interface.';
+          if(!runtime.includes(stale)) throw new Error('stale Safe Core v2 runtime label not found');
+          runtime=runtime.replace(stale,'Safe Core does not expose the expected Codex/context interface.');
+          fs.writeFileSync('src/commit-runtime.js',runtime);
+          for(const file of ['package.json','package-lock.json']){
+            const data=JSON.parse(fs.readFileSync(file,'utf8')); data.version='4.0.2';
+            if(file==='package-lock.json'&&data.packages?.['']) data.packages[''].version='4.0.2';
+            fs.writeFileSync(file,JSON.stringify(data,null,2)+'\n');
+          }
+          let changelog=fs.readFileSync('CHANGELOG.md','utf8');
+          if(!changelog.includes('## 4.0.2')) changelog=changelog.replace('## Unreleased\n','## Unreleased\n\n## 4.0.2\n\n### Changed\n\n- Remove obsolete Safe Core version labels from current runtime errors; protocol identity remains machine-validated by Family v4 gates.\n');
+          fs.writeFileSync('CHANGELOG.md',changelog);
+          let verifier=fs.readFileSync('scripts/verify-manifest.js','utf8');
+          const anchor="const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));";
+          if(verifier.includes(anchor)&&!verifier.includes("pkg.version !== '4.0.2'")) verifier=verifier.replace(anchor,anchor+"\nif (pkg.version !== '4.0.2') fail('Commit product version must be 4.0.2.');");
+          const runtimeAnchor="if (!/await fingerprintDiff\\(diff\\)/.test(extensionSource)) fail('Commit receipt diff fingerprint must await Core fingerprintDiff.');";
+          if(verifier.includes(runtimeAnchor)) verifier=verifier.replace(runtimeAnchor,runtimeAnchor+"\nconst commitRuntimeSource = fs.readFileSync(path.join(root, 'src', 'commit-runtime.js'), 'utf8');\nif (/Safe Core v[123]\\b/.test(commitRuntimeSource)) fail('Current Commit runtime must not carry obsolete Safe Core version labels.');");
+          fs.writeFileSync('scripts/verify-manifest.js',verifier);
+          NODE
+          rm .github/workflows/apply-v4.0.2-hygiene.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/commit-runtime.js package.json package-lock.json CHANGELOG.md scripts/verify-manifest.js .github/workflows/apply-v4.0.2-hygiene.yml
+          git diff --cached --check
+          git commit -m "fix: remove stale Safe Core runtime labels"
+          git push origin HEAD:v4.0.2-runtime-hygiene
