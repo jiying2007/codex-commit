@@ -16,7 +16,7 @@ const {
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = '4dc4de836625a8b70084531eb3321734eca675d0';
+const EXPECTED_CORE_COMMIT = '270fe1e5740f837a2359e50c0d943be8e7b3926d';
 
 function fail(message) {
   console.error(`manifest verification failed: ${message}`);
@@ -53,7 +53,7 @@ if (/\bbranch\s*=/.test(gitmodules)) fail('Codex Safe Core submodule must be com
 const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'], { cwd: root, encoding: 'utf8' }).trim();
 const gitlink = staged.match(/^160000 ([0-9a-f]{40,64}) 0\tsrc\/codex-safe-core$/i);
 if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
-if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin final Safe Core 4.0.0 main commit ${EXPECTED_CORE_COMMIT}.`);
+if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin Safe Core 4.0.1 maintenance commit ${EXPECTED_CORE_COMMIT}.`);
 
 if (fs.existsSync(path.join(root, 'src', 'process-runner.js'))) fail('Commit must consume Core process-runner directly; src/process-runner.js proxy is forbidden.');
 for (const required of ['src/ui.js', 'src/policy.js', 'src/repository-ui.js', 'src/review-evidence.js']) {
@@ -82,4 +82,4 @@ for (const [key, value] of Object.entries(properties)) {
   if (value.scope !== 'application') fail(`${key} must use application scope.`);
 }
 
-console.log('Codex Commit Safe Family v4 ownership, exact Safe Core 4.0.0 pin, Policy v3, Receipt v4 and Prompt Contract v1 gates verified.');
+console.log('Codex Commit Safe Family v4 ownership, exact Safe Core 4.0.1 maintenance pin, Policy v3, Receipt v4 and Prompt Contract v1 gates verified.');
