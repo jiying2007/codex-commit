@@ -65,6 +65,8 @@ for (const functionName of ['getEffectiveOptions', 'getRepositories', 'chooseRep
   if (new RegExp(`(?:async\\s+)?function\\s+${functionName}\\s*\\(`).test(extensionSource)) fail(`${functionName} must stay outside extension.js.`);
 }
 if (!/await fingerprintDiff\(diff\)/.test(extensionSource)) fail('Commit receipt diff fingerprint must await Core fingerprintDiff.');
+const commitRuntimeSource = fs.readFileSync(path.join(root, 'src', 'commit-runtime.js'), 'utf8');
+if (/Safe Core v[123]\b/.test(commitRuntimeSource)) fail('Current Commit runtime must not carry obsolete Safe Core version labels.');
 
 if (pkg.main !== './dist/extension.js') fail('package main must point to dist/extension.js.');
 if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exactly to 0.28.2.');

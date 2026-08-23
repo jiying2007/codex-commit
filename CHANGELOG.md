@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 4.0.2
+
+### Changed
+
+- Remove obsolete Safe Core version labels from current runtime errors; protocol identity remains machine-validated by Family v4 gates.
+
 ## 4.0.0
 
 ### Changed

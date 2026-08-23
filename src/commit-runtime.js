@@ -33,7 +33,7 @@ function loadSafeCore() {
     typeof safeCoreModule?.parseCodexJsonl !== 'function' ||
     typeof safeCoreModule?.buildSemanticContext !== 'function'
   ) {
-    throw new TypeError('Safe Core v2 does not expose the expected Codex/context interface.');
+    throw new TypeError('Safe Core does not expose the expected Codex/context interface.');
   }
   return safeCoreModule;
 }
