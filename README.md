@@ -49,7 +49,7 @@ The only repository policy is committed `.codex-safe.json` with `schemaVersion: 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/6c0417a376179c295433c18b1b077854d290243d/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/7ffbf6f1791e17ba74faf0922e7a702bdac72059/codex-safe.schema.json",
   "schemaVersion": 3,
   "commit": {
     "language": "en",
