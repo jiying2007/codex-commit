@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const { compareVersions, parseGitHubRemote, parseVersion, platformCommand, sameFiles, updateChangelog } = require('./release');
 
 assert.deepStrictEqual(parseVersion('1.2.3'), [1, 2, 3]);
@@ -20,4 +22,18 @@ assert.strictEqual(sameFiles(['package.json', 'CHANGELOG.md']), false);
 const source = '# Changelog\n\n## Unreleased\n\n- New behavior.\n\n## 1.0.0\n\n- Initial.\n';
 assert.strictEqual(updateChangelog(source, '1.0.1'), '# Changelog\n\n## Unreleased\n\n## 1.0.1\n\n- New behavior.\n\n## 1.0.0\n\n- Initial.\n');
 assert.throws(() => updateChangelog('# Changelog\n\n## Unreleased\n\n## 1.0.0\n', '1.0.1'), /Unreleased 区域为空/);
-console.log('Release helper tests passed.');
+
+const root=path.resolve(__dirname,'..');
+const marketplace=fs.readFileSync(path.join(root,'.github','workflows','marketplace.yml'),'utf8');
+assert.match(marketplace,/gh release download/);
+assert.match(marketplace,/sha256sum -c SHA256SUMS/);
+assert.match(marketplace,/gh attestation verify .* -R "\$GITHUB_REPOSITORY"/);
+assert.match(marketplace,/vsce publish --packagePath/);
+assert.doesNotMatch(marketplace,/npm run package|vsce package/,'Marketplace must publish exact GitHub Release VSIX without rebuilding');
+const renovate=JSON.parse(fs.readFileSync(path.join(root,'renovate.json'),'utf8'));
+assert.ok(renovate.extends.includes(':automergeDisabled'));
+assert.equal(renovate.minimumReleaseAge,'3 days');
+const verification=fs.readFileSync(path.join(root,'VERIFY_RELEASE.md'),'utf8');
+assert.match(verification,/gh attestation verify codex-commit-safe-<version>\.vsix -R jiying2007\/codex-commit/);
+
+console.log('Release helper, Marketplace artifact reuse, provenance verification and dependency governance tests passed.');
