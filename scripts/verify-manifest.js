@@ -16,21 +16,11 @@ const {
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = '21be53cf90e586880c30a7a9bd56bb7cad5fa563';
+const EXPECTED_CORE_COMMIT = '6c0417a376179c295433c18b1b077854d290243d';
 
-function fail(message) {
-  console.error(`manifest verification failed: ${message}`);
-  process.exit(2);
-}
+function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
-if (
-  SAFE_CORE_VERSION !== 4 ||
-  SAFE_CONTRACT_VERSION !== 2 ||
-  POLICY_SCHEMA_VERSION !== 3 ||
-  REVIEW_RECEIPT_SCHEMA_VERSION !== 4 ||
-  COMMIT_RECEIPT_SCHEMA_VERSION !== 4 ||
-  COMMIT_PROMPT_CONTRACT_VERSION !== 1
-) {
+if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 3 || REVIEW_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_PROMPT_CONTRACT_VERSION !== 1) {
   fail('Family v4 requires Safe Core 4, Safe Contract 2, Policy Schema 3, Review/Commit Receipt 4 and Commit Prompt Contract 1.');
 }
 if (!Array.isArray(POLICY_SECTION_KEYS?.commit)) fail('Core must expose canonical commit policy keys.');
@@ -54,16 +44,14 @@ const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'
 const gitlink = staged.match(/^160000 ([0-9a-f]{40,64}) 0\tsrc\/codex-safe-core$/i);
 if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
 if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core maintenance commit ${EXPECTED_CORE_COMMIT}.`);
+const policyExample=JSON.parse(fs.readFileSync(path.join(root,'.codex-safe.example.json'),'utf8'));
+if (!String(policyExample.$schema||'').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
 
 if (fs.existsSync(path.join(root, 'src', 'process-runner.js'))) fail('Commit must consume Core process-runner directly; src/process-runner.js proxy is forbidden.');
-for (const required of ['src/ui.js', 'src/policy.js', 'src/repository-ui.js', 'src/review-evidence.js']) {
-  if (!fs.existsSync(path.join(root, required))) fail(`missing production service module: ${required}`);
-}
+for (const required of ['src/ui.js', 'src/policy.js', 'src/repository-ui.js', 'src/review-evidence.js']) if (!fs.existsSync(path.join(root, required))) fail(`missing production service module: ${required}`);
 const extensionSource = fs.readFileSync(path.join(root, 'extension.js'), 'utf8');
 if (/\b__test\b/.test(extensionSource)) fail('extension.__test compatibility surface must not return.');
-for (const functionName of ['getEffectiveOptions', 'getRepositories', 'chooseRepository', 'getReviewEvidence']) {
-  if (new RegExp(`(?:async\\s+)?function\\s+${functionName}\\s*\\(`).test(extensionSource)) fail(`${functionName} must stay outside extension.js.`);
-}
+for (const functionName of ['getEffectiveOptions', 'getRepositories', 'chooseRepository', 'getReviewEvidence']) if (new RegExp(`(?:async\\s+)?function\\s+${functionName}\\s*\\(`).test(extensionSource)) fail(`${functionName} must stay outside extension.js.`);
 if (!/await fingerprintDiff\(diff\)/.test(extensionSource)) fail('Commit receipt diff fingerprint must await Core fingerprintDiff.');
 const commitRuntimeSource = fs.readFileSync(path.join(root, 'src', 'commit-runtime.js'), 'utf8');
 if (/Safe Core v[123]\b/.test(commitRuntimeSource)) fail('Current Commit runtime must not carry obsolete Safe Core version labels.');
@@ -77,9 +65,6 @@ if (fs.existsSync(path.join(root, 'tsconfig.pure.json'))) fail('tsconfig.pure.js
 if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) fail('extensionKind must be ["workspace"].');
 const properties = pkg.contributes?.configuration?.properties || {};
 if (properties['safeCodexCommit.codexPath']?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
-for (const [key, value] of Object.entries(properties)) {
-  if (key === 'safeCodexCommit.codexPath') continue;
-  if (value.scope !== 'application') fail(`${key} must use application scope.`);
-}
+for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexCommit.codexPath' && value.scope !== 'application') fail(`${key} must use application scope.`); }
 
-console.log('Codex Commit Safe Family v4 ownership, coordinated exact Core pin, Policy v3, Receipt v4 and Prompt Contract v1 gates verified.');
+console.log('Codex Commit Safe Family v4 ownership, coordinated exact Core/schema pin, Policy v3, Receipt v4 and Prompt Contract v1 gates verified.');
