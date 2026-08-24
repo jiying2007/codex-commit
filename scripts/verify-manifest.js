@@ -67,4 +67,6 @@ const properties = pkg.contributes?.configuration?.properties || {};
 if (properties['safeCodexCommit.codexPath']?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
 for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexCommit.codexPath' && value.scope !== 'application') fail(`${key} must use application scope.`); }
 
-console.log('Codex Commit Safe Family v4 ownership, coordinated exact Core/schema pin, Policy v3, Receipt v4 and Prompt Contract v1 gates verified.');
+require('./verify-product-docs');
+
+console.log('Codex Commit Safe Family v4 ownership, coordinated exact Core/schema pin, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
