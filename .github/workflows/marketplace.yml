@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Immutable GitHub Release tag to publish, for example v2.1.0'
+        description: 'Immutable GitHub Release tag to publish, for example v4.0.2'
         required: true
 
 permissions:
   contents: read
+  attestations: read
 
 concurrency:
   group: vscode-marketplace-${{ inputs.tag }}
@@ -69,6 +70,7 @@ jobs:
           test -f "release-artifacts/$vsix"
           test -f release-artifacts/SHA256SUMS
           (cd release-artifacts && sha256sum -c SHA256SUMS)
+          gh attestation verify "release-artifacts/$vsix" -R "$GITHUB_REPOSITORY"
           unzip -Z1 "release-artifacts/$vsix" > /tmp/vsix-files.txt
           grep -Fx 'extension/package.nls.json' /tmp/vsix-files.txt
           grep -Fx 'extension/package.nls.zh-cn.json' /tmp/vsix-files.txt
@@ -87,7 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${VSCE_PAT:-}" || {
-            echo 'VSCE_PAT is required for Marketplace publishing. Configure the repository secret before running this workflow.' >&2
+            echo 'VSCE_PAT is required with stable @vscode/vsce 3.9.x. Migrate to trusted OIDC publishing only after a stable vsce release ships --oidc.' >&2
             exit 1
           }
           vsix="release-artifacts/codex-commit-safe-${{ steps.release.outputs.version }}.vsix"
