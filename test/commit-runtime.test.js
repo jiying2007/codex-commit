@@ -64,7 +64,7 @@ const runtime = createCommitRuntime({
   assert.strictEqual(runtime.formatCommitMessage(structured, options), 'fix(core): repair race');
 
   const resolved = await runtime.resolveCodexExecutable('codex');
-  assert.deepStrictEqual(resolved, { executable: 'codex', version: 'codex-cli 1.2.3' });
+  assert.deepStrictEqual(resolved, { executable: process.platform === 'win32' ? 'codex.exe' : 'codex', version: 'codex-cli 1.2.3' });
   assert.deepStrictEqual(await runtime.probeCodexCapabilities('codex'), { ok: true });
 
   const args = runtime.buildCodexArgs('/tmp/schema.json', 'gpt-test');
