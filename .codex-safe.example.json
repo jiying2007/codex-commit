@@ -1,7 +1,20 @@
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/a0c3419684f835108cad31eb909b3d7f7df7b260/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/1755262f51d5e15d74e432add38863d2383bb495/codex-safe.schema.json",
   "schemaVersion": 3,
-  "commit": { "language": "zh-CN", "scopePolicy": "flexible", "autoInferScope": true, "styleHistoryLimit": 12 },
-  "review": { "language": "zh-CN", "severityThreshold": "low", "confidenceThreshold": 0.7, "maxFindings": 40 },
-  "pr": { "language": "zh-CN", "includePullRequestTemplate": true }
+  "commit": {
+    "language": "zh-CN",
+    "scopePolicy": "flexible",
+    "autoInferScope": true,
+    "styleHistoryLimit": 12
+  },
+  "review": {
+    "language": "zh-CN",
+    "severityThreshold": "low",
+    "confidenceThreshold": 0.7,
+    "maxFindings": 40
+  },
+  "pr": {
+    "language": "zh-CN",
+    "includePullRequestTemplate": true
+  }
 }
