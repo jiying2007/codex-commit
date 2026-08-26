@@ -15,7 +15,13 @@ const runtime = createCommitRuntime({
     if (args.length === 1 && args[0] === '--help') return { stdout: REQUIRED_CODEX_TOP_LEVEL_FLAGS.join(' '), stderr: '' };
     if (args.length === 2 && args[0] === 'exec' && args[1] === '--help') return { stdout: [...REQUIRED_CODEX_EXEC_FLAGS, '--model'].join(' '), stderr: '' };
     if (args.includes('exec') && args.includes('--json') && args.includes('--output-schema')) {
-      return { stdout: JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } }) + '\n', stderr: '' };
+      return {
+        stdout: [
+          JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 120, cached_input_tokens: 40, output_tokens: 12 } }),
+          JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } })
+        ].join('\n') + '\n',
+        stderr: ''
+      };
     }
     throw new Error(`unexpected prepared call: ${command} ${args.join(' ')}`);
   },
@@ -27,6 +33,8 @@ const runtime = createCommitRuntime({
   assert.strictEqual(typeof safeCore.createCodexCli, 'function');
   assert.strictEqual(typeof safeCore.parseCodexJsonl, 'function');
   assert.strictEqual(typeof safeCore.buildSemanticContext, 'function');
+  assert.strictEqual(typeof safeCore.scoreEvidenceRisk, 'function');
+  assert.strictEqual(typeof safeCore.adaptiveBudget, 'function');
 
   const options = {
     language: 'en',
@@ -86,7 +94,20 @@ const runtime = createCommitRuntime({
   ].join('\n');
   const result = await runtime.runCodex(diff, options, 'core', '', ['Recent subjects usually omit terminal punctuation (0% end with punctuation).']);
   assert.deepStrictEqual(result, structured);
-  assert.deepStrictEqual(result.executionMeta, { codexVersion: 'codex-cli 1.2.3', requestedModel: '', resolvedModel: '' });
+  assert.strictEqual(result.executionMeta.codexVersion, 'codex-cli 1.2.3');
+  assert.strictEqual(result.executionMeta.requestedModel, '');
+  assert.strictEqual(result.executionMeta.resolvedModel, '');
+  assert.ok(Number.isInteger(result.executionMeta.riskScore));
+  assert.ok(result.executionMeta.contextBudgetBytes <= options.maxDiffBytes);
+  assert.ok(result.executionMeta.requestEstimate.totalTokens > 0);
+  assert.deepStrictEqual(result.executionMeta.usage, {
+    inputTokens: 120,
+    cachedInputTokens: 40,
+    cacheWriteInputTokens: 0,
+    outputTokens: 12,
+    reasoningOutputTokens: 0
+  });
+  assert.ok(result.executionMeta.durationMs >= 0);
   const execution = calls.find(call => call.args.includes('exec') && call.args.includes('--output-schema'));
   assert(execution, 'Safe Core structured execution was not invoked');
   assert.match(execution.stdinText, /--- STAGED GIT CONTEXT START ---/);
@@ -97,7 +118,12 @@ const runtime = createCommitRuntime({
   assert.strictEqual(execution.options.timeoutMs, 90000);
   assert.match(execution.options.cwd, /codex-commit-/);
 
-  console.log('Commit Safe Core semantic-context adapter tests passed.');
+  const largeLowRiskDiff = ['diff --git a/docs/guide.md b/docs/guide.md','--- a/docs/guide.md','+++ b/docs/guide.md','@@ -1 +1 @@',`-${'a'.repeat(20000)}`,`+${'b'.repeat(20000)}`].join('\n');
+  const lowRiskOptions = { ...options, maxDiffBytes: 65536 };
+  const lowRisk = await runtime.runCodex(largeLowRiskDiff, lowRiskOptions, '', '', []);
+  assert.ok(lowRisk.executionMeta.contextBudgetBytes < lowRiskOptions.maxDiffBytes, 'low-risk context should shrink below the configured cap');
+
+  console.log('Commit Safe Core semantic-context and efficiency adapter tests passed.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
