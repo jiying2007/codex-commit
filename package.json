@@ -5,258 +5,45 @@
   "version": "4.0.2",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
-  "engines": {
-    "vscode": "^1.90.0"
-  },
-  "extensionKind": [
-    "workspace"
-  ],
-  "categories": [
-    "SCM Providers",
-    "Other"
-  ],
-  "keywords": [
-    "git",
-    "commit",
-    "codex",
-    "conventional commits",
-    "ai",
-    "scm",
-    "staged",
-    "safe"
-  ],
-  "activationEvents": [
-    "onCommand:safeCodexCommit.generate",
-    "onCommand:safeCodexCommit.regenerate",
-    "onCommand:safeCodexCommit.checkEnvironment"
-  ],
+  "engines": {"vscode": "^1.90.0"},
+  "extensionKind": ["workspace"],
+  "categories": ["SCM Providers", "Other"],
+  "keywords": ["git","commit","codex","conventional commits","ai","scm","staged","safe"],
+  "activationEvents": ["onCommand:safeCodexCommit.generate","onCommand:safeCodexCommit.regenerate","onCommand:safeCodexCommit.checkEnvironment"],
   "main": "./dist/extension.js",
-  "capabilities": {
-    "untrustedWorkspaces": {
-      "supported": false,
-      "description": "%capability.untrusted%"
-    },
-    "virtualWorkspaces": {
-      "supported": false,
-      "description": "%capability.virtual%"
-    }
-  },
+  "capabilities": {"untrustedWorkspaces":{"supported":false,"description":"%capability.untrusted%"},"virtualWorkspaces":{"supported":false,"description":"%capability.virtual%"}},
   "contributes": {
     "commands": [
-      {
-        "command": "safeCodexCommit.generate",
-        "title": "%command.generate.title%",
-        "category": "%extension.displayName%",
-        "icon": "$(sparkle)"
-      },
-      {
-        "command": "safeCodexCommit.regenerate",
-        "title": "%command.regenerate.title%",
-        "category": "%extension.displayName%",
-        "icon": "$(redo)"
-      },
-      {
-        "command": "safeCodexCommit.checkEnvironment",
-        "title": "%command.checkEnvironment.title%",
-        "category": "%extension.displayName%",
-        "icon": "$(check)"
-      }
+      {"command":"safeCodexCommit.generate","title":"%command.generate.title%","category":"%extension.displayName%","icon":"$(sparkle)"},
+      {"command":"safeCodexCommit.regenerate","title":"%command.regenerate.title%","category":"%extension.displayName%","icon":"$(redo)"},
+      {"command":"safeCodexCommit.checkEnvironment","title":"%command.checkEnvironment.title%","category":"%extension.displayName%","icon":"$(check)"}
     ],
-    "menus": {
-      "scm/title": [
-        {
-          "command": "safeCodexCommit.generate",
-          "when": "scmProvider == git && isWorkspaceTrusted",
-          "group": "navigation@5"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "safeCodexCommit.generate",
-          "when": "workspaceFolderCount > 0 && isWorkspaceTrusted"
-        },
-        {
-          "command": "safeCodexCommit.regenerate",
-          "when": "workspaceFolderCount > 0 && isWorkspaceTrusted"
-        },
-        {
-          "command": "safeCodexCommit.checkEnvironment",
-          "when": "isWorkspaceTrusted"
-        }
-      ]
-    },
-    "jsonValidation": [
-      {
-        "fileMatch": ".codex-safe.json",
-        "url": "./dist/codex-safe.schema.json"
-      }
-    ],
-    "configuration": {
-      "title": "%extension.displayName%",
-      "properties": {
-        "safeCodexCommit.codexPath": {
-          "type": "string",
-          "default": "codex",
-          "scope": "machine",
-          "description": "%config.codexPath%"
-        },
-        "safeCodexCommit.model": {
-          "type": "string",
-          "default": "",
-          "scope": "application",
-          "description": "%config.model%"
-        },
-        "safeCodexCommit.language": {
-          "type": "string",
-          "enum": [
-            "zh-CN",
-            "en"
-          ],
-          "default": "zh-CN",
-          "scope": "application",
-          "description": "%config.language%",
-          "enumDescriptions": [
-            "%config.language.zhCN%",
-            "%config.language.en%"
-          ]
-        },
-        "safeCodexCommit.maxDiffBytes": {
-          "type": "number",
-          "default": 262144,
-          "minimum": 4096,
-          "maximum": 2097152,
-          "scope": "application",
-          "description": "%config.maxDiffBytes%"
-        },
-        "safeCodexCommit.subjectMaxLength": {
-          "type": "number",
-          "default": 72,
-          "minimum": 30,
-          "maximum": 120,
-          "scope": "application",
-          "description": "%config.subjectMaxLength%"
-        },
-        "safeCodexCommit.maxBodyChars": {
-          "type": "number",
-          "default": 2000,
-          "minimum": 200,
-          "maximum": 10000,
-          "scope": "application",
-          "description": "%config.maxBodyChars%"
-        },
-        "safeCodexCommit.scopes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [
-            "bsp",
-            "driver",
-            "wifi",
-            "audio",
-            "motor",
-            "imu",
-            "ota",
-            "mcu",
-            "nand",
-            "power",
-            "camera",
-            "system"
-          ],
-          "scope": "application",
-          "description": "%config.scopes%"
-        },
-        "safeCodexCommit.scopeHints": {
-          "type": "object",
-          "default": {},
-          "scope": "application",
-          "additionalProperties": {
-            "type": "array",
-            "maxItems": 32,
-            "items": {
-              "type": "string"
-            }
-          },
-          "description": "%config.scopeHints%"
-        },
-        "safeCodexCommit.scopePolicy": {
-          "type": "string",
-          "enum": [
-            "flexible",
-            "strict"
-          ],
-          "default": "flexible",
-          "scope": "application",
-          "description": "%config.scopePolicy%",
-          "enumDescriptions": [
-            "%config.scopePolicy.flexible%",
-            "%config.scopePolicy.strict%"
-          ]
-        },
-        "safeCodexCommit.autoInferScope": {
-          "type": "boolean",
-          "default": true,
-          "scope": "application",
-          "description": "%config.autoInferScope%"
-        },
-        "safeCodexCommit.styleHistoryLimit": {
-          "type": "number",
-          "default": 12,
-          "minimum": 0,
-          "maximum": 50,
-          "scope": "application",
-          "description": "%config.styleHistoryLimit%"
-        },
-        "safeCodexCommit.extraInstructions": {
-          "type": "string",
-          "default": "",
-          "scope": "application",
-          "description": "%config.extraInstructions%"
-        },
-        "safeCodexCommit.timeoutSeconds": {
-          "type": "number",
-          "default": 90,
-          "minimum": 10,
-          "maximum": 300,
-          "scope": "application",
-          "description": "%config.timeoutSeconds%"
-        }
-      }
-    }
+    "menus": {"scm/title":[{"command":"safeCodexCommit.generate","when":"scmProvider == git && isWorkspaceTrusted","group":"navigation@5"}],"commandPalette":[{"command":"safeCodexCommit.generate","when":"workspaceFolderCount > 0 && isWorkspaceTrusted"},{"command":"safeCodexCommit.regenerate","when":"workspaceFolderCount > 0 && isWorkspaceTrusted"},{"command":"safeCodexCommit.checkEnvironment","when":"isWorkspaceTrusted"}]},
+    "jsonValidation": [{"fileMatch":".codex-safe.json","url":"./dist/codex-safe.schema.json"}],
+    "configuration": {"title":"%extension.displayName%","properties":{
+      "safeCodexCommit.codexPath":{"type":"string","default":"codex","scope":"machine","description":"%config.codexPath%"},
+      "safeCodexCommit.model":{"type":"string","default":"","scope":"application","description":"%config.model%"},
+      "safeCodexCommit.language":{"type":"string","enum":["zh-CN","en"],"default":"zh-CN","scope":"application","description":"%config.language%","enumDescriptions":["%config.language.zhCN%","%config.language.en%"]},
+      "safeCodexCommit.maxDiffBytes":{"type":"number","default":262144,"minimum":4096,"maximum":2097152,"scope":"application","description":"%config.maxDiffBytes%"},
+      "safeCodexCommit.subjectMaxLength":{"type":"number","default":72,"minimum":30,"maximum":120,"scope":"application","description":"%config.subjectMaxLength%"},
+      "safeCodexCommit.maxBodyChars":{"type":"number","default":2000,"minimum":200,"maximum":10000,"scope":"application","description":"%config.maxBodyChars%"},
+      "safeCodexCommit.scopes":{"type":"array","items":{"type":"string"},"default":["bsp","driver","wifi","audio","motor","imu","ota","mcu","nand","power","camera","system"],"scope":"application","description":"%config.scopes%"},
+      "safeCodexCommit.scopeHints":{"type":"object","default":{},"scope":"application","additionalProperties":{"type":"array","maxItems":32,"items":{"type":"string"}},"description":"%config.scopeHints%"},
+      "safeCodexCommit.scopePolicy":{"type":"string","enum":["flexible","strict"],"default":"flexible","scope":"application","description":"%config.scopePolicy%","enumDescriptions":["%config.scopePolicy.flexible%","%config.scopePolicy.strict%"]},
+      "safeCodexCommit.autoInferScope":{"type":"boolean","default":true,"scope":"application","description":"%config.autoInferScope%"},
+      "safeCodexCommit.styleHistoryLimit":{"type":"number","default":12,"minimum":0,"maximum":50,"scope":"application","description":"%config.styleHistoryLimit%"},
+      "safeCodexCommit.extraInstructions":{"type":"string","default":"","scope":"application","description":"%config.extraInstructions%"},
+      "safeCodexCommit.timeoutSeconds":{"type":"number","default":90,"minimum":10,"maximum":300,"scope":"application","description":"%config.timeoutSeconds%"}
+    }}
   },
   "scripts": {
-    "core:init": "git submodule update --init --recursive",
-    "precheck": "npm run core:init",
-    "pretest": "npm run core:init",
-    "prebuild": "npm run core:init",
-    "prepackage": "npm run core:init",
-    "check": "node --check extension.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check src/policy-validation.js && node --check src/git-repository.js && node --check src/receipts.js && node --check src/codex-safe-core/safe-contract.js && node --check src/codex-safe-core/codex-cli.js && node --check src/codex-safe-core/process-runner.js && node --check src/codex-safe-core/git-repository.js && node --check src/codex-safe-core/policy.js && node --check src/codex-safe-core/context-builder.js && node --check src/commit-runtime.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && npm run test:unit && npm run build",
-    "test:unit": "node test.js && node test/review-evidence.test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && node test/policy-validation.test.js && node test/git-repository.test.js && node test/commit-runtime.test.js && node test/receipts.test.js",
-    "test:integration": "npm run build && node ./test/integration/runTest.js",
-    "test": "npm run test:unit",
-    "package": "npm run build && vsce package --no-dependencies",
-    "verify:lock": "node ./scripts/verify-lock.js",
-    "verify:manifest": "node ./scripts/verify-manifest.js",
-    "release:prepare": "node ./scripts/release.js prepare",
-    "release:check": "node ./scripts/release.js check",
-    "release:push": "node ./scripts/release.js push",
-    "ci": "npm run verify:lock && npm ci --ignore-scripts --no-audit --no-fund && npm run check && npm run test:integration && npm run package",
-    "build": "node scripts/build.js"
+    "core:init":"git submodule update --init --recursive","precheck":"npm run core:init","pretest":"npm run core:init","prebuild":"npm run core:init","prepackage":"npm run core:init",
+    "governance":"node src/codex-safe-core/scripts/verify-actions-pins.js .github/workflows && node src/codex-safe-core/scripts/verify-non-goals.js .",
+    "diagnostics":"node src/codex-safe-core/scripts/family-diagnostics.js",
+    "check":"node --check extension.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check src/policy-validation.js && node --check src/git-repository.js && node --check src/receipts.js && node --check src/codex-safe-core/safe-contract.js && node --check src/codex-safe-core/codex-cli.js && node --check src/codex-safe-core/process-runner.js && node --check src/codex-safe-core/git-repository.js && node --check src/codex-safe-core/policy.js && node --check src/codex-safe-core/context-builder.js && node --check src/commit-runtime.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node scripts/release.test.js && npm run governance && npm run test:unit && npm run build",
+    "test:unit":"node test.js && node test/review-evidence.test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && node test/policy-validation.test.js && node test/git-repository.test.js && node test/commit-runtime.test.js && node test/receipts.test.js",
+    "test:integration":"npm run build && node ./test/integration/runTest.js","test":"npm run test:unit","package":"npm run build && vsce package --no-dependencies","verify:lock":"node ./scripts/verify-lock.js","verify:manifest":"node ./scripts/verify-manifest.js","release:prepare":"node ./scripts/release.js prepare","release:check":"node ./scripts/release.js check","release:push":"node ./scripts/release.js push","ci":"npm run verify:lock && npm ci --ignore-scripts --no-audit --no-fund && npm run check && npm run test:integration && npm run package","build":"node scripts/build.js"
   },
-  "devDependencies": {
-    "@vscode/test-electron": "3.1.0",
-    "@vscode/vsce": "3.9.2",
-    "esbuild": "0.28.2"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jiying2007/codex-commit.git"
-  },
-  "homepage": "https://github.com/jiying2007/codex-commit#readme",
-  "bugs": {
-    "url": "https://github.com/jiying2007/codex-commit/issues"
-  },
-  "pricing": "Free",
-  "preview": false,
-  "icon": "images/icon.png"
+  "devDependencies":{"@vscode/test-electron":"3.1.0","@vscode/vsce":"3.9.2","esbuild":"0.28.2"},
+  "repository":{"type":"git","url":"https://github.com/jiying2007/codex-commit.git"},"homepage":"https://github.com/jiying2007/codex-commit#readme","bugs":{"url":"https://github.com/jiying2007/codex-commit/issues"},"pricing":"Free","preview":false,"icon":"images/icon.png"
 }
