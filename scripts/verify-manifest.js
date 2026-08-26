@@ -16,7 +16,7 @@ const {
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = '391dde3e7558a9edceef6840de331b8b7c95a375';
+const EXPECTED_CORE_COMMIT = '72363d4f648171242810ac5871d713b2fa9b3bb6';
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
