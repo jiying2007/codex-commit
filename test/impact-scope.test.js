@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('assert');
+const { impactScopeHints, mergeScopeHints }=require('../src/impact-scope');
+const diff=['diff --git a/motor/foc.c b/motor/foc.c','+++ b/motor/foc.c','@@ -1 +1,2 @@','+#include "motor_control.h"','+static void foc_current_loop(void) {}','+if (CONFIG_MOTOR_FOC) {}'].join('\n');
+const result=impactScopeHints(diff,['motor','audio','system']);
+assert.ok(result.signalCount>=3);
+assert.ok(Array.isArray(result.hints.motor));
+assert.ok(result.hints.motor.some(value=>/motor|foc/i.test(value)));
+const merged=mergeScopeHints({motor:['wheel']},result.hints);
+assert.ok(merged.motor.includes('wheel'));
+assert.ok(merged.motor.length>=2);
+console.log('Commit impact-scope tests passed.');
