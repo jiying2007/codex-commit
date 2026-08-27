@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 4.1.0 - 2026-08-27
+
+- Adopt Safe Core 4.4 Quality Platform and use deterministic Impact Signals as bounded weak evidence for the existing scope/domain classifier.
+- Reduce regeneration reference text from 2000 to 800 characters while preserving staged evidence, risk-aware context and Commit Receipt v4 semantics.
+- Keep Safe Contract v2, Policy Schema v3 and Commit Prompt Contract v1 unchanged; no analyzer, auto-fix or review-only configuration is added to Commit Safe.
+
 ## 4.0.2
 
 ### Changed
