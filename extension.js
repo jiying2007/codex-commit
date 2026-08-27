@@ -3,6 +3,7 @@
 const vscode = require('vscode');
 const { COMMIT_RECEIPT_SCHEMA_VERSION, fingerprint, validateCommitReceipt } = require('./src/codex-safe-core/safe-contract');
 const { inferScopeDecision, emptyScopeDecision, summarizeScopeDecision } = require('./src/scope-intelligence');
+const { impactScopeHints, mergeScopeHints } = require('./src/impact-scope');
 const { createProcessRunner } = require('./src/codex-safe-core/process-runner');
 const { createGitRepository } = require('./src/git-repository');
 const { createCommitRuntime } = require('./src/commit-runtime');
@@ -184,12 +185,14 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
         }
         log(`input prepared: files=${stagedPaths.length}, diffBytes=${size}, modelBudgetBytes=${options.maxDiffBytes}`);
 
+        const impactScope = options.autoInferScope ? impactScopeHints(diff, options.scopes) : { hints: {}, signalCount: 0 };
+        const effectiveScopeHints = mergeScopeHints(options.scopeHints, impactScope.hints);
         const scopeDecision = options.autoInferScope
-          ? inferScopeDecision(stagedPaths, options.scopes, diff, options.scopeHints)
+          ? inferScopeDecision(stagedPaths, options.scopes, diff, effectiveScopeHints)
           : emptyScopeDecision();
-        if (options.autoInferScope) log(summarizeScopeDecision(scopeDecision));
+        if (options.autoInferScope) log(`${summarizeScopeDecision(scopeDecision)}, impactSignals=${impactScope.signalCount}`);
         const preferredScope = scopeDecision.scope;
-        const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 2000) : '';
+        const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 800) : '';
         const repositoryStyleGuidance = await getRepositoryStyleGuidance(
           repoRoot,
           snapshotAfter.headOid,
