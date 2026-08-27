@@ -17,12 +17,16 @@ const VALID_TYPES = new Set([
  *   probeCodexCapabilities: (resolved: string | ResolvedCodex, model?: string) => Promise<any>,
  *   buildCodexArgs: (schemaPath: string, model?: string) => string[],
  *   withTemporaryDirectory: <T>(fn: (tempDir: string) => Promise<T>) => Promise<T>,
- *   runStructuredCodex: (request: any) => Promise<{ parsed: any, resolved: ResolvedCodex, processResult: TextProcessResult }>
+ *   runStructuredCodex: (request: any) => Promise<any>
  * }} SafeCodexCli
  * @typedef {{
  *   createCodexCli: (options: any) => SafeCodexCli,
  *   parseCodexJsonl: (stdout: string) => string,
- *   buildSemanticContext: (request: any) => any
+ *   buildSemanticContext: (request: any) => any,
+ *   splitUnifiedDiff: (diff: string) => any[],
+ *   scoreEvidenceRisk: (request: any) => number,
+ *   adaptiveBudget: (cap: number, riskScore: number, options?: any) => number,
+ *   selectModel: (request: any) => string
  * }} SafeCoreModule
  */
 
@@ -31,9 +35,13 @@ function loadSafeCore() {
   if (
     typeof safeCoreModule?.createCodexCli !== 'function' ||
     typeof safeCoreModule?.parseCodexJsonl !== 'function' ||
-    typeof safeCoreModule?.buildSemanticContext !== 'function'
+    typeof safeCoreModule?.buildSemanticContext !== 'function' ||
+    typeof safeCoreModule?.splitUnifiedDiff !== 'function' ||
+    typeof safeCoreModule?.scoreEvidenceRisk !== 'function' ||
+    typeof safeCoreModule?.adaptiveBudget !== 'function' ||
+    typeof safeCoreModule?.selectModel !== 'function'
   ) {
-    throw new TypeError('Safe Core does not expose the expected Codex/context interface.');
+    throw new TypeError('Safe Core does not expose the expected Codex/context/efficiency interface.');
   }
   return safeCoreModule;
 }
@@ -241,7 +249,11 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
   /** @param {string} diff @param {any} options @param {string} preferredScope @param {string} previousMessage @param {string[]} repositoryStyleGuidance @param {any} [token] */
   async function runCodex(diff, options, preferredScope, previousMessage, repositoryStyleGuidance, token) {
     const prompt = buildPrompt(options, preferredScope, previousMessage, repositoryStyleGuidance);
-    const semanticContext = safeCore.buildSemanticContext({ diff, maxBytes: options.maxDiffBytes });
+    const paths = safeCore.splitUnifiedDiff(diff).map(block => block.path);
+    const riskScore = safeCore.scoreEvidenceRisk({ paths, text: diff });
+    const contextBudgetBytes = safeCore.adaptiveBudget(options.maxDiffBytes, riskScore, { lowFactor: 0.35, mediumFactor: 0.65, min: 16 * 1024 });
+    const semanticContext = safeCore.buildSemanticContext({ diff, maxBytes: contextBudgetBytes });
+    const model = safeCore.selectModel({ model: options.model, fastModel: options.fastModel, riskScore });
     const input = [
       prompt,
       '',
@@ -250,22 +262,31 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       '--- STAGED GIT CONTEXT END ---',
       ''
     ].join('\n');
+    const automaticTokenCap = Math.max(8192, Math.ceil(Number(options.maxDiffBytes || 0) / 2) + 4096);
     try {
       const result = await cli.runStructuredCodex({
         codexPath: options.codexPath,
-        model: options.model,
+        model,
         timeoutMs: options.timeoutSeconds * 1000,
         schema: outputSchema(options),
         input,
         schemaFileName: 'commit-schema.json',
-        token
+        token,
+        maxEstimatedTokens: Number(options.maxTokenBudget) > 0 ? Number(options.maxTokenBudget) : automaticTokenCap,
+        estimatedOutputTokens: 1024
       });
       const structured = validateStructuredResult(result.parsed, options);
       Object.defineProperty(structured, 'executionMeta', {
         value: Object.freeze({
           codexVersion: result.resolved?.version || 'unknown',
           requestedModel: options.model || '',
-          resolvedModel: options.model || ''
+          resolvedModel: model || '',
+          riskScore,
+          contextBudgetBytes,
+          inputDiffBytes: semanticContext.inputDiffBytes,
+          requestEstimate: result.requestEstimate,
+          usage: result.usage,
+          durationMs: result.durationMs
         }),
         enumerable: false, configurable: false, writable: false
       });
