@@ -112,3 +112,7 @@ npm run ci
 ## License
 
 MIT
+
+## Codex Provider Runtime
+
+Codex Commit Safe 会主动忽略 `~/.codex/config.toml`。中转站使用 `safeCodexCommit.providerMode=openai-compatible`、`providerBaseUrl` 和 `providerApiKeyEnv`；Key 本身只保存在对应环境变量。兼容端点固定走 Responses HTTP/SSE，环境检查会真实完成一次结构化 round-trip。

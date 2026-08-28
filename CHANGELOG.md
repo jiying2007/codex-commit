@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.2.0 - 2026-08-28
+
+- Consume Core v4.6 Codex Runtime/Provider Contract, add explicit OpenAI-compatible relay configuration, live Environment Check, split runtime timeouts and provider-aware diagnostics while keeping Safe Contract isolation.
+
 ## Unreleased
 
 ## 4.1.1 - 2026-08-27

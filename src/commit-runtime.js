@@ -267,7 +267,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       const result = await cli.runStructuredCodex({
         codexPath: options.codexPath,
         model,
-        timeoutMs: options.timeoutSeconds * 1000,
+        runtime: options.codexRuntime,
         schema: outputSchema(options),
         input,
         schemaFileName: 'commit-schema.json',
@@ -320,6 +320,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     formatCommitMessage,
     resolveCodexExecutable,
     probeCodexCapabilities,
+    probeCodexRuntime: request => cli.probeCodexRuntime(request),
     buildCodexArgs,
     runCodex,
     findWindowsCodexCandidates: cli.findWindowsCodexCandidates,
