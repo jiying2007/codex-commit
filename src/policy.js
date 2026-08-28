@@ -2,6 +2,7 @@
 
 const vscode = require('vscode');
 const { fingerprintPolicy } = require('./codex-safe-core/safe-contract');
+const { normalizeCodexRuntimeOptions } = require('./codex-safe-core/codex-runtime');
 const { POLICY_FILE } = require('./codex-safe-core/policy');
 const { createPolicyValidators } = require('./policy-validation');
 
@@ -26,6 +27,35 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
     validateScopePolicy,
     validateExtraInstructions
   } = createPolicyValidators(ui);
+
+  function runtimeOptions(config, project) {
+    const providerMode = String(getUserOnlySetting(config, 'providerMode', 'openai') || 'openai').trim();
+    const provider = providerMode === 'openai-compatible'
+      ? {
+          mode: providerMode,
+          baseUrl: String(getUserOnlySetting(config, 'providerBaseUrl', '') || '').trim(),
+          apiKeyEnv: String(getUserOnlySetting(config, 'providerApiKeyEnv', 'OPENAI_API_KEY') || '').trim()
+        }
+      : { mode: providerMode };
+    const projectOperationSeconds = project.timeoutSeconds === undefined
+      ? undefined
+      : clampNumber(project.timeoutSeconds, 90, 10, 300, 'timeoutSeconds');
+    const operationSeconds = projectOperationSeconds ?? clampNumber(
+      getUserOnlySetting(config, 'operationTimeoutSeconds', 180), 180, 30, 900, 'operationTimeoutSeconds'
+    );
+    const requestSeconds = clampNumber(
+      getUserOnlySetting(config, 'requestTimeoutSeconds', 120), 120, 10, Math.min(900, operationSeconds), 'requestTimeoutSeconds'
+    );
+    return normalizeCodexRuntimeOptions({
+      provider,
+      timeouts: {
+        connectMs: clampNumber(getUserOnlySetting(config, 'connectTimeoutSeconds', 15), 15, 1, 120, 'connectTimeoutSeconds') * 1000,
+        requestMs: Math.min(requestSeconds, operationSeconds) * 1000,
+        operationMs: operationSeconds * 1000,
+        idleMs: clampNumber(getUserOnlySetting(config, 'streamIdleTimeoutSeconds', 60), 60, 5, 600, 'streamIdleTimeoutSeconds') * 1000
+      }
+    });
+  }
 
   async function getEffectiveOptions(repoRoot, headOid, token) {
     const config = vscode.workspace.getConfiguration('safeCodexCommit', vscode.Uri.file(repoRoot));
@@ -59,9 +89,11 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
     ].filter(Boolean).join('\n');
     if (extraInstructions.length > 4000) throw new Error(ui('合并后的 extraInstructions 最长 4000 字符。', 'Combined extraInstructions cannot exceed 4000 characters.'));
 
+    const codexRuntime = runtimeOptions(config, project);
     const options = {
       codexPath,
       model,
+      codexRuntime,
       language,
       maxDiffBytes: clampNumber(project.maxDiffBytes ?? config.get('maxDiffBytes', 262144), 262144, 4096, 2097152, 'maxDiffBytes'),
       subjectMaxLength: clampNumber(project.subjectMaxLength ?? config.get('subjectMaxLength', 72), 72, 30, 120, 'subjectMaxLength'),
@@ -72,7 +104,6 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
       autoInferScope: typeof project.autoInferScope === 'boolean' ? project.autoInferScope : Boolean(config.get('autoInferScope', true)),
       styleHistoryLimit: clampNumber(project.styleHistoryLimit ?? config.get('styleHistoryLimit', 12), 12, 0, 50, 'styleHistoryLimit'),
       extraInstructions,
-      timeoutSeconds: clampNumber(project.timeoutSeconds ?? config.get('timeoutSeconds', 90), 90, 10, 300, 'timeoutSeconds'),
       policySource: policy.source,
       projectPolicyFingerprint: policy.fingerprint
     };
@@ -87,13 +118,13 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
       autoInferScope: options.autoInferScope,
       styleHistoryLimit: options.styleHistoryLimit,
       extraInstructions: options.extraInstructions,
-      timeoutSeconds: options.timeoutSeconds,
+      codexRuntime: options.codexRuntime,
       projectPolicyFingerprint: options.projectPolicyFingerprint
     });
     return Object.freeze(options);
   }
 
-  return Object.freeze({ getEffectiveOptions });
+  return Object.freeze({ getEffectiveOptions, runtimeOptions });
 }
 
 module.exports = Object.freeze({ getUserOnlySetting, createCommitPolicy });
