@@ -14,13 +14,16 @@ const {
   scoreEvidenceRisk,
   adaptiveBudget,
   estimateRequestTokens,
-  extractImpactSignals
+  extractImpactSignals,
+  normalizeCodexRuntimeOptions,
+  providerConfigOverrides,
+  classifyCodexFailure
 } = require('../src/codex-safe-core');
 
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = '0caabb91ad7f2bcedb9f3e5ac50ba4c68a315d46';
+const EXPECTED_CORE_COMMIT = 'ada3733a0d938b763fd241628da86990af7cfad7';
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
@@ -28,7 +31,8 @@ if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERS
   fail('Family v4 requires Safe Core 4, Safe Contract 2, Policy Schema 3, Review/Commit Receipt 4 and Commit Prompt Contract 1.');
 }
 if (!Array.isArray(POLICY_SECTION_KEYS?.commit)) fail('Core must expose canonical commit policy keys.');
-if (typeof scoreEvidenceRisk !== 'function' || typeof adaptiveBudget !== 'function' || typeof estimateRequestTokens !== 'function' || typeof extractImpactSignals !== 'function') fail('Core v4.4 efficiency/quality exports are missing.');
+if (typeof scoreEvidenceRisk !== 'function' || typeof adaptiveBudget !== 'function' || typeof estimateRequestTokens !== 'function' || typeof extractImpactSignals !== 'function') fail('Core quality/efficiency exports are missing.');
+if (typeof normalizeCodexRuntimeOptions !== 'function' || typeof providerConfigOverrides !== 'function' || typeof classifyCodexFailure !== 'function') fail('Core v4.6 Codex Runtime/Provider Contract exports are missing.');
 if (!fs.existsSync(schemaPath)) fail('canonical Codex Safe schema is missing from the Core submodule.');
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
@@ -48,7 +52,7 @@ if (/\bbranch\s*=/.test(gitmodules)) fail('Codex Safe Core submodule must be com
 const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'], { cwd: root, encoding: 'utf8' }).trim();
 const gitlink = staged.match(/^160000 ([0-9a-f]{40,64}) 0\tsrc\/codex-safe-core$/i);
 if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
-if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core quality-platform commit ${EXPECTED_CORE_COMMIT}.`);
+if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core v4.6 runtime commit ${EXPECTED_CORE_COMMIT}.`);
 const policyExample=JSON.parse(fs.readFileSync(path.join(root,'.codex-safe.example.json'),'utf8'));
 if (!String(policyExample.$schema||'').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
 
@@ -60,7 +64,8 @@ for (const functionName of ['getEffectiveOptions', 'getRepositories', 'chooseRep
 if (!/await fingerprintDiff\(diff\)/.test(extensionSource)) fail('Commit receipt diff fingerprint must await Core fingerprintDiff.');
 const commitRuntimeSource = fs.readFileSync(path.join(root, 'src', 'commit-runtime.js'), 'utf8');
 if (/Safe Core v[123]\b/.test(commitRuntimeSource)) fail('Current Commit runtime must not carry obsolete Safe Core version labels.');
-if (!/scoreEvidenceRisk/.test(commitRuntimeSource) || !/adaptiveBudget/.test(commitRuntimeSource) || !/requestEstimate/.test(commitRuntimeSource) || !/usage/.test(commitRuntimeSource)) fail('Commit runtime must retain Core v4.4 risk/token/impact execution metadata.');
+if (!/scoreEvidenceRisk/.test(commitRuntimeSource) || !/adaptiveBudget/.test(commitRuntimeSource) || !/requestEstimate/.test(commitRuntimeSource) || !/usage/.test(commitRuntimeSource)) fail('Commit runtime must retain Core risk/token/impact execution metadata.');
+if (!/runtime:\s*options\.codexRuntime/.test(commitRuntimeSource)) fail('Commit model execution must use the shared Core runtime contract.');
 
 if (pkg.main !== './dist/extension.js') fail('package main must point to dist/extension.js.');
 if (pkg.devDependencies?.esbuild !== '0.28.2') fail('esbuild must be pinned exactly to 0.28.2.');
@@ -75,4 +80,4 @@ for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexC
 
 require('./verify-product-docs');
 
-console.log('Codex Commit Safe Family v4.4 ownership, exact Core/schema pin, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
+console.log('Codex Commit Safe Family v4.6 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
