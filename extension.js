@@ -34,7 +34,7 @@ const {
   fingerprintDiff,
   readProjectRulesAtHead
 } = createGitRepository({ runProcess, runProcessBuffer, ui });
-const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
+const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
 const { getEffectiveOptions } = createCommitPolicy({ ui, readProjectRulesAtHead });
 const { getRepositories, chooseRepository, setCommitInput, getCurrentCommitInput } = createRepositoryUi({
   git,
@@ -282,7 +282,7 @@ async function checkEnvironment() {
   const repoRoot = repositories[0]?.root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
   const headOid = await getHeadOid(repoRoot);
   const options = await getEffectiveOptions(repoRoot, headOid);
-  const resolved = await resolveCodexExecutable(options.codexPath);
+  const runtime = await probeCodexRuntime({ codexPath: options.codexPath, model: options.model, runtime: options.codexRuntime });
 
   let gitVersion = '';
   try {
@@ -293,11 +293,11 @@ async function checkEnvironment() {
       'Git was not found. Make sure git --version runs successfully.'
     ));
   }
-  await probeCodexCapabilities(resolved.executable, { requireModel: Boolean(options.model) });
-  log(`environment ok: codex=${resolved.version || 'detected'}, git=detected, cliCapabilities=ok`);
+  const endpoint = runtime.provider.endpointHost || 'Codex default';
+  log(`environment ok: codex=${runtime.codexVersion || 'detected'}, provider=${runtime.provider.mode}, endpoint=${endpoint}, liveProbeMs=${runtime.durationMs}`);
   vscode.window.showInformationMessage(ui(
-    `Codex Commit Safe 环境正常：${resolved.version || resolved.executable}；${gitVersion}；必需 CLI 能力正常`,
-    `Codex Commit Safe environment is ready: ${resolved.version || resolved.executable}; ${gitVersion}; required CLI capabilities OK`
+    `Codex Commit Safe 环境正常：${runtime.codexVersion || options.codexPath}；${gitVersion}；Provider ${runtime.provider.mode} (${endpoint})；真实结构化探测 ${runtime.durationMs} ms`,
+    `Codex Commit Safe environment is ready: ${runtime.codexVersion || options.codexPath}; ${gitVersion}; provider ${runtime.provider.mode} (${endpoint}); live structured probe ${runtime.durationMs} ms`
   ));
 }
 

@@ -2,7 +2,7 @@
   "name": "codex-commit-safe",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -105,6 +105,60 @@
           "default": "",
           "scope": "application",
           "description": "%config.model%"
+        },
+        "safeCodexCommit.providerMode": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "openai-compatible"
+          ],
+          "default": "openai",
+          "scope": "application",
+          "description": "Codex provider runtime: built-in OpenAI or an explicitly configured OpenAI-compatible Responses endpoint."
+        },
+        "safeCodexCommit.providerBaseUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "HTTPS base URL for openai-compatible mode. User Codex config.toml is intentionally ignored."
+        },
+        "safeCodexCommit.providerApiKeyEnv": {
+          "type": "string",
+          "default": "OPENAI_API_KEY",
+          "scope": "application",
+          "description": "Environment-variable name containing the provider API key; the secret value is never stored in settings."
+        },
+        "safeCodexCommit.connectTimeoutSeconds": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 120,
+          "scope": "application",
+          "description": "Provider connection timeout in seconds."
+        },
+        "safeCodexCommit.requestTimeoutSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 10,
+          "maximum": 900,
+          "scope": "application",
+          "description": "Maximum time for one Codex request."
+        },
+        "safeCodexCommit.operationTimeoutSeconds": {
+          "type": "number",
+          "default": 180,
+          "minimum": 30,
+          "maximum": 900,
+          "scope": "application",
+          "description": "Whole Commit generation operation deadline."
+        },
+        "safeCodexCommit.streamIdleTimeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "maximum": 600,
+          "scope": "application",
+          "description": "Maximum provider response-stream idle time."
         },
         "safeCodexCommit.language": {
           "type": "string",
@@ -212,14 +266,6 @@
           "default": "",
           "scope": "application",
           "description": "%config.extraInstructions%"
-        },
-        "safeCodexCommit.timeoutSeconds": {
-          "type": "number",
-          "default": 90,
-          "minimum": 10,
-          "maximum": 300,
-          "scope": "application",
-          "description": "%config.timeoutSeconds%"
         }
       }
     }

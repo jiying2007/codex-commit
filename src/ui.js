@@ -11,14 +11,12 @@ function ui(zh, en) {
 }
 
 function friendlyError(error) {
-  const detail = error?.stderr || error?.message || String(error);
-  if (error?.code === 'ETIMEDOUT') {
-    return ui(
-      `${detail}。可提高 safeCodexCommit.timeoutSeconds，或检查 Codex 网络/登录状态。`,
-      `${detail}. Increase safeCodexCommit.timeoutSeconds or check Codex network/authentication status.`
-    );
-  }
-  return detail;
+  const detail = error?.message || error?.stderr || String(error);
+  const provider = error?.provider;
+  const meta = provider ? ` Provider: ${provider.mode}${provider.endpointHost ? ` @ ${provider.endpointHost}` : ''}.` : '';
+  const timing = Number.isFinite(error?.elapsedMs) ? ` Elapsed: ${Math.round(error.elapsedMs / 100) / 10}s${Number.isFinite(error?.lastActivityMs) ? `; last activity ${Math.round(error.lastActivityMs / 100) / 10}s ago` : ''}.` : '';
+  const diagnostic = error?.diagnosticTail ? ` Diagnostic: ${String(error.diagnosticTail).slice(-1200)}` : '';
+  return `${detail}${meta}${timing}${diagnostic}`;
 }
 
 module.exports = Object.freeze({ isChineseUi, ui, friendlyError });
