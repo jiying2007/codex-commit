@@ -30,7 +30,8 @@ jobs:
           git add -A
           git diff --cached --check
           npm ci --ignore-scripts --no-audit --no-fund
-          npm run ci
+          npm run check
+          npm run package
           rm .github/workflows/finalize-runtime-provider.yml scripts/finalize-runtime-provider.py
           git add -A
           git diff --cached --check
