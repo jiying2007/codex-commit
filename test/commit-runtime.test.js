@@ -35,7 +35,17 @@ const runtime = createCommitRuntime({
   assert.strictEqual(typeof safeCore.buildSemanticContext, 'function');
   assert.strictEqual(typeof safeCore.scoreEvidenceRisk, 'function');
   assert.strictEqual(typeof safeCore.adaptiveBudget, 'function');
+  assert.strictEqual(typeof safeCore.normalizeCodexRuntimeOptions, 'function');
 
+  const codexRuntime = safeCore.normalizeCodexRuntimeOptions({
+    provider: { mode: 'openai' },
+    timeouts: {
+      connectMs: 15000,
+      requestMs: 180000,
+      operationMs: 240000,
+      idleMs: 60000
+    }
+  });
   const options = {
     language: 'en',
     subjectMaxLength: 72,
@@ -46,7 +56,7 @@ const runtime = createCommitRuntime({
     extraInstructions: '',
     codexPath: 'codex',
     model: '',
-    timeoutSeconds: 90
+    codexRuntime
   };
 
   const prompt = runtime.buildPrompt(options, 'core', 'fix(core): old wording', [
@@ -115,7 +125,7 @@ const runtime = createCommitRuntime({
   assert.match(execution.stdinText, /Generated\/lock files \(1, metadata only\):/);
   assert.match(execution.stdinText, /\+const safe = true/);
   assert.doesNotMatch(execution.stdinText, /\+\{"lock":2\}/);
-  assert.strictEqual(execution.options.timeoutMs, 90000);
+  assert.strictEqual(execution.options.timeoutMs, options.codexRuntime.timeouts.requestMs);
   assert.match(execution.options.cwd, /codex-commit-/);
 
   const largeLowRiskDiff = ['diff --git a/docs/guide.md b/docs/guide.md','--- a/docs/guide.md','+++ b/docs/guide.md','@@ -1 +1 @@',`-${'a'.repeat(20000)}`,`+${'b'.repeat(20000)}`].join('\n');
@@ -123,7 +133,7 @@ const runtime = createCommitRuntime({
   const lowRisk = await runtime.runCodex(largeLowRiskDiff, lowRiskOptions, '', '', []);
   assert.ok(lowRisk.executionMeta.contextBudgetBytes < lowRiskOptions.maxDiffBytes, 'low-risk context should shrink below the configured cap');
 
-  console.log('Commit Safe Core semantic-context and efficiency adapter tests passed.');
+  console.log('Commit Safe Core semantic-context, shared runtime, and efficiency adapter tests passed.');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
