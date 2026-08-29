@@ -23,7 +23,7 @@ const {
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = '9efb165bb8f2b9b71aeb944f978bc5740629979b';
+const EXPECTED_CORE_COMMIT = 'e99962ca45f832211a58fe7eac229f6c648c5152';
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
@@ -52,7 +52,7 @@ if (/\bbranch\s*=/.test(gitmodules)) fail('Codex Safe Core submodule must be com
 const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'], { cwd: root, encoding: 'utf8' }).trim();
 const gitlink = staged.match(/^160000 ([0-9a-f]{40,64}) 0\tsrc\/codex-safe-core$/i);
 if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
-if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core v4.6 runtime commit ${EXPECTED_CORE_COMMIT}.`);
+if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core v4.7 release commit ${EXPECTED_CORE_COMMIT}.`);
 const policyExample=JSON.parse(fs.readFileSync(path.join(root,'.codex-safe.example.json'),'utf8'));
 if (!String(policyExample.$schema||'').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
 if (Object.prototype.hasOwnProperty.call(policyExample,'pr')) fail('.codex-safe.example.json must not reintroduce the retired PR policy surface.');
@@ -81,4 +81,4 @@ for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexC
 
 require('./verify-product-docs');
 
-console.log('Codex Commit Safe Family v4.6 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
+console.log('Codex Commit Safe Family v4.7 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
