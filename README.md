@@ -77,11 +77,9 @@ Codex Review Safe → Review Receipt v4
 Codex Commit Safe → Commit Receipt v4
     ↓
 manual git commit
-    ↓
-Codex PR Safe → PR narrative + verified provenance
 ```
 
-Commit Safe works independently; using Review Safe first adds stronger provenance.
+Commit Safe works independently; using Review Safe first adds stronger provenance. Create and manage PR/MR metadata with the SCM's native UI, CLI or API; Codex PR Safe is retired.
 
 ## Install, upgrade and verify
 

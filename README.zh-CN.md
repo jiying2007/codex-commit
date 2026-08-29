@@ -77,11 +77,9 @@ Codex Review Safe → Review Receipt v4
 Codex Commit Safe → Commit Receipt v4
     ↓
 人工 git commit
-    ↓
-Codex PR Safe → PR narrative + verified provenance
 ```
 
-Commit Safe 可以独立使用；先运行 Review Safe 可以得到更完整的 provenance。
+Commit Safe 可以独立使用；先运行 Review Safe 可以得到更完整的 provenance。PR/MR 创建和元数据由 SCM 原生 UI、CLI 或 API 负责；Codex PR Safe 已退役。
 
 ## 安装、升级与验证
 

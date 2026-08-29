@@ -103,7 +103,7 @@ Commit Receipt v4 binds:
 
 The receipt is initially pending because Commit Safe never performs the commit itself.
 
-When Codex PR Safe later requests range evidence, Commit Safe recomputes the real first-parent commit diff and final commit message. A pending receipt is bound to a real `commitOid` only when the parent/diff/message fingerprints match. Editing the message or committed content invalidates provenance.
+When a later SCM-native workflow consumes range evidence, Commit Safe recomputes the real first-parent commit diff and final commit message. A pending receipt is bound to a real `commitOid` only when the parent/diff/message fingerprints match. Editing the message or committed content invalidates provenance. Codex PR Safe is retired and is not an active receipt consumer.
 
 Receipts are workflow evidence, not authorization to commit and not proof of tests or human approval.
 

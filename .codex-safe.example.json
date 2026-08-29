@@ -1,6 +1,16 @@
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/e75d27d5f157cacc5e8f6b711355dd5cf4ddfe34/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/b71e11ef3eafba5aa4359376c79a792a05ee85eb/codex-safe.schema.json",
   "schemaVersion": 3,
-  "commit": { "language": "zh-CN", "scopePolicy": "flexible", "autoInferScope": true, "styleHistoryLimit": 12 },
-  "review": { "language": "zh-CN", "severityThreshold": "low", "confidenceThreshold": 0.7, "maxFindings": 40 }
+  "commit": {
+    "language": "zh-CN",
+    "scopePolicy": "flexible",
+    "autoInferScope": true,
+    "styleHistoryLimit": 12
+  },
+  "review": {
+    "language": "zh-CN",
+    "severityThreshold": "low",
+    "confidenceThreshold": 0.7,
+    "maxFindings": 40
+  }
 }
