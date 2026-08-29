@@ -23,7 +23,7 @@ const {
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = 'ada3733a0d938b763fd241628da86990af7cfad7';
+const EXPECTED_CORE_COMMIT = '9efb165bb8f2b9b71aeb944f978bc5740629979b';
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
@@ -55,6 +55,7 @@ if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
 if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core v4.6 runtime commit ${EXPECTED_CORE_COMMIT}.`);
 const policyExample=JSON.parse(fs.readFileSync(path.join(root,'.codex-safe.example.json'),'utf8'));
 if (!String(policyExample.$schema||'').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
+if (Object.prototype.hasOwnProperty.call(policyExample,'pr')) fail('.codex-safe.example.json must not reintroduce the retired PR policy surface.');
 
 if (fs.existsSync(path.join(root, 'src', 'process-runner.js'))) fail('Commit must consume Core process-runner directly; src/process-runner.js proxy is forbidden.');
 for (const required of ['src/ui.js', 'src/policy.js', 'src/repository-ui.js', 'src/review-evidence.js']) if (!fs.existsSync(path.join(root, required))) fail(`missing production service module: ${required}`);
