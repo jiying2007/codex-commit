@@ -1,5 +1,12 @@
 # Changelog
 
+
+## 4.2.3
+
+- Repin to immutable Codex Safe Core v4.9.0 (10393a0035ce5168b3d0e88822af0d74fe85ec6c) and adopt Product Contract v1.
+- Derive current documentation/Core identity checks from machine contracts instead of preserving historical SHA/version literals.
+- No Commit runtime, Safe Contract, Policy Schema, Receipt, or authority boundary change.
+
 ## 4.2.0 - 2026-08-28
 
 - Consume Core v4.6 Codex Runtime/Provider Contract, add explicit OpenAI-compatible relay configuration, live Environment Check, split runtime timeouts and provider-aware diagnostics while keeping Safe Contract isolation.
