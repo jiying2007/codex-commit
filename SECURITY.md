@@ -1,6 +1,6 @@
 # Security
 
-Codex Commit Safe follows the **Codex Safe Core v3** contract. Security-sensitive shared primitives are owned by the pinned `codex-safe-core` submodule; the extension repository owns Commit-specific domain logic only.
+Codex Commit Safe follows the **Codex Safe Core v4** contract. Security-sensitive shared primitives are owned by the pinned `codex-safe-core` submodule; the extension repository owns Commit-specific domain logic only.
 
 ## Trust boundaries
 
@@ -43,7 +43,7 @@ Codex executes from a temporary directory rather than the repository.
 
 ### 4. Repository policy
 
-The only repository policy is `.codex-safe.json` schema v2. Commit consumes only the `commit` section from the exact captured HEAD.
+The only repository policy is `.codex-safe.json` schema v3. Commit consumes only the `commit` section from the exact captured HEAD.
 
 Working-tree/staged policy edits cannot change the policy used to describe their own commit. Unknown fields and malformed policy fail closed.
 
@@ -89,7 +89,7 @@ When enabled, recent Commit subjects are read from the exact HEAD snapshot and r
 
 ## Review and Commit receipts
 
-A matching Codex Review Safe Receipt v2 may be referenced by fingerprint in the generated Commit Receipt v4.
+A matching Codex Review Safe Receipt v4 may be referenced by fingerprint in the generated Commit Receipt v4.
 
 Commit Receipt v4 binds:
 

@@ -23,7 +23,9 @@ const {
 const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
-const EXPECTED_CORE_COMMIT = 'd06383ecf58b8153ddbd9d0b26a4f83b6e0515c2';
+const productContract = require('../product-contract.json');
+const coreContract = require('../src/codex-safe-core/core-contract.json');
+const EXPECTED_CORE_COMMIT = productContract.safeCoreCommit;
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
@@ -52,7 +54,7 @@ if (/\bbranch\s*=/.test(gitmodules)) fail('Codex Safe Core submodule must be com
 const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'], { cwd: root, encoding: 'utf8' }).trim();
 const gitlink = staged.match(/^160000 ([0-9a-f]{40,64}) 0\tsrc\/codex-safe-core$/i);
 if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
-if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated Safe Core v4.8 release commit ${EXPECTED_CORE_COMMIT}.`);
+if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated immutable Safe Core release commit ${EXPECTED_CORE_COMMIT}.`);
 const policyExample=JSON.parse(fs.readFileSync(path.join(root,'.codex-safe.example.json'),'utf8'));
 if (!String(policyExample.$schema||'').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
 if (Object.prototype.hasOwnProperty.call(policyExample,'pr')) fail('.codex-safe.example.json must not reintroduce the retired PR policy surface.');
@@ -79,6 +81,7 @@ const properties = pkg.contributes?.configuration?.properties || {};
 if (properties['safeCodexCommit.codexPath']?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
 for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexCommit.codexPath' && value.scope !== 'application') fail(`${key} must use application scope.`); }
 
+require('../src/codex-safe-core/scripts/verify-consumer-product-contract').verify(root,EXPECTED_CORE_COMMIT,'codex-commit-safe');
 require('./verify-product-docs');
 
-console.log('Codex Commit Safe Family v4.8 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
+console.log('Codex Commit Safe Family v4.9 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
