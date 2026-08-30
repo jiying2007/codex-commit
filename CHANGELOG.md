@@ -6,6 +6,10 @@
 
 ## Unreleased
 
+## 4.2.2 - 2026-08-30
+
+- Repin to immutable Codex Safe Core v4.8.1 (`d06383ecf58b8153ddbd9d0b26a4f83b6e0515c2`) after the Family workspace/test-stability maintenance line; preserve Commit runtime behavior, Safe Contract v2, Policy Schema v3 and Receipt/Prompt contracts.
+
 ## 4.2.1 - 2026-08-28
 
 - Publish the complete bilingual OpenAI-compatible relay setup and troubleshooting guide; Commit runtime, Safe Contract and Core pin are unchanged.
