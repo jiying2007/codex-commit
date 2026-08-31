@@ -37,20 +37,20 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - HEAD/index changes invalidate stale results;
 - matching Review Receipt v4 can be incorporated into Commit provenance;
 - pending Commit Receipt v4 binds HEAD, index, full diff, final message, policy and review evidence;
-- later PR evidence is accepted only after recomputing the real first-parent commit fingerprints;
+- later Change evidence is accepted only after recomputing the real first-parent commit fingerprints;
 - Safe Contract v2 runs Codex ephemeral/read-only/no-approval with shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency installation disabled;
 - no source edit, commit or push side effect.
 
-Shared safety/runtime behavior comes only from the exact commit-pinned `codex-safe-core` v4 submodule.
+Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.10.0** submodule at `57440a00030941020d5c3e9e01ced3c06062f42e`.
 
 ## Repository policy
 
-The only repository policy is committed `.codex-safe.json` with `schemaVersion: 3`:
+The only repository policy is committed `.codex-safe.json` with `schemaVersion: 4`. Safe Core owns the closed `commit`, `review`, `change`, and `reviewService` sections; Commit Safe consumes only Commit policy while Change Safe owns delivery interpretation.
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/43e818dc9ae91051f55374a9f9a47b9df6420cd6/codex-safe.schema.json",
-  "schemaVersion": 3,
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/57440a00030941020d5c3e9e01ced3c06062f42e/codex-safe.schema.json",
+  "schemaVersion": 4,
   "commit": {
     "language": "en",
     "maxDiffBytes": 262144,
@@ -61,7 +61,8 @@ The only repository policy is committed `.codex-safe.json` with `schemaVersion: 
     "autoInferScope": true,
     "styleHistoryLimit": 12,
     "timeoutSeconds": 90
-  }
+  },
+  "change": {}
 }
 ```
 
@@ -76,10 +77,14 @@ Codex Review Safe → Review Receipt v4
     ↓
 Codex Commit Safe → Commit Receipt v4
     ↓
-manual git commit
+manual git commit / push
+    ↓
+Codex Change Safe → Change Receipt v1
+    ↓
+GitHub PR / GitLab MR
 ```
 
-Commit Safe works independently; using Review Safe first adds stronger provenance. Create and manage PR/MR metadata with the SCM's native UI, CLI or API; Codex PR Safe is retired.
+Commit Safe works independently; using Review Safe first adds stronger provenance. **Codex PR Safe** is retired as the former model-generated PR-description product; **Codex Change Safe** is the deterministic successor delivery stage and does not restore that narrative generator.
 
 ## Install, upgrade and verify
 
