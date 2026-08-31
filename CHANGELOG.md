@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.2.5
+
+- Align the primary VS Code SCM toolbar with the Family UI Contract: Commit is the single `navigation@6` primary action after Review.
+- Repin to immutable Safe Core 4.10.2.
+
 ## 4.2.4 - 2026-08-31
 
 - Publish the already-validated Commit Safe main line on immutable Safe Core v4.10.1 (`76418b80533c644e3ab01045290cd3cdd355622c`) and Policy Schema v4.
