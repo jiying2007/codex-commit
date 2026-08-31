@@ -24,23 +24,24 @@ const root = path.resolve(__dirname, '..');
 const pkg = require(path.join(root, 'package.json'));
 const schemaPath = path.join(root, 'src', 'codex-safe-core', 'codex-safe.schema.json');
 const productContract = require('../product-contract.json');
-const coreContract = require('../src/codex-safe-core/core-contract.json');
 const EXPECTED_CORE_COMMIT = productContract.safeCoreCommit;
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
-if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 3 || REVIEW_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_PROMPT_CONTRACT_VERSION !== 1) {
-  fail('Family v4 requires Safe Core 4, Safe Contract 2, Policy Schema 3, Review/Commit Receipt 4 and Commit Prompt Contract 1.');
+if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 4 || REVIEW_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_PROMPT_CONTRACT_VERSION !== 1) {
+  fail('Family v4 requires Safe Core 4, Safe Contract 2, Policy Schema 4, Review/Commit Receipt 4 and Commit Prompt Contract 1.');
 }
-if (!Array.isArray(POLICY_SECTION_KEYS?.commit)) fail('Core must expose canonical commit policy keys.');
+if (!Array.isArray(POLICY_SECTION_KEYS?.commit) || !Array.isArray(POLICY_SECTION_KEYS?.change)) fail('Core must expose canonical commit/change policy keys.');
 if (typeof scoreEvidenceRisk !== 'function' || typeof adaptiveBudget !== 'function' || typeof estimateRequestTokens !== 'function' || typeof extractImpactSignals !== 'function') fail('Core quality/efficiency exports are missing.');
 if (typeof normalizeCodexRuntimeOptions !== 'function' || typeof providerConfigOverrides !== 'function' || typeof classifyCodexFailure !== 'function') fail('Core Codex Runtime/Provider Contract exports are missing.');
 if (!fs.existsSync(schemaPath)) fail('canonical Codex Safe schema is missing from the Core submodule.');
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
-if (schema.properties?.schemaVersion?.const !== 3) fail('canonical policy schema must be schemaVersion 3.');
+if (schema.properties?.schemaVersion?.const !== 4) fail('canonical policy schema must be schemaVersion 4.');
 const commitSchema = schema.properties?.commit;
+const changeSchema = schema.properties?.change;
 if (!commitSchema || commitSchema.additionalProperties !== false) fail('canonical commit policy schema must fail closed.');
+if (!changeSchema || changeSchema.additionalProperties !== false) fail('canonical change policy schema must fail closed.');
 const schemaKeys = Object.keys(commitSchema.properties || {}).sort();
 const runtimeKeys = [...POLICY_SECTION_KEYS.commit].sort();
 if (JSON.stringify(schemaKeys) !== JSON.stringify(runtimeKeys)) fail(`canonical commit policy schema/runtime keys drifted: schema=${JSON.stringify(schemaKeys)} runtime=${JSON.stringify(runtimeKeys)}`);
@@ -55,9 +56,11 @@ const staged = execFileSync('git', ['ls-files', '--stage', 'src/codex-safe-core'
 const gitlink = staged.match(/^160000 ([0-9a-f]{40,64}) 0\tsrc\/codex-safe-core$/i);
 if (!gitlink) fail('src/codex-safe-core must be a Git submodule gitlink.');
 if (gitlink[1] !== EXPECTED_CORE_COMMIT) fail(`src/codex-safe-core must pin coordinated immutable Safe Core release commit ${EXPECTED_CORE_COMMIT}.`);
-const policyExample=JSON.parse(fs.readFileSync(path.join(root,'.codex-safe.example.json'),'utf8'));
-if (!String(policyExample.$schema||'').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
-if (Object.prototype.hasOwnProperty.call(policyExample,'pr')) fail('.codex-safe.example.json must not reintroduce the retired PR policy surface.');
+const policyExample = JSON.parse(fs.readFileSync(path.join(root, '.codex-safe.example.json'), 'utf8'));
+if (!String(policyExample.$schema || '').includes(EXPECTED_CORE_COMMIT)) fail('.codex-safe.example.json must pin schema provenance to the exact Core gitlink.');
+if (policyExample.schemaVersion !== 4) fail('.codex-safe.example.json must use Policy Schema v4.');
+if (Object.prototype.hasOwnProperty.call(policyExample, 'pr')) fail('.codex-safe.example.json must not reintroduce the retired PR policy surface.');
+if (fs.existsSync(path.join(root, '.codex-change-safe.json'))) fail('parallel Change policy files are forbidden; use .codex-safe.json.change.');
 
 if (fs.existsSync(path.join(root, 'src', 'process-runner.js'))) fail('Commit must consume Core process-runner directly; src/process-runner.js proxy is forbidden.');
 for (const required of ['src/ui.js', 'src/policy.js', 'src/repository-ui.js', 'src/review-evidence.js']) if (!fs.existsSync(path.join(root, required))) fail(`missing production service module: ${required}`);
@@ -81,7 +84,7 @@ const properties = pkg.contributes?.configuration?.properties || {};
 if (properties['safeCodexCommit.codexPath']?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
 for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexCommit.codexPath' && value.scope !== 'application') fail(`${key} must use application scope.`); }
 
-require('../src/codex-safe-core/scripts/verify-consumer-product-contract').verify(root,EXPECTED_CORE_COMMIT,'codex-commit-safe');
+require('../src/codex-safe-core/scripts/verify-consumer-product-contract').verify(root, EXPECTED_CORE_COMMIT, 'codex-commit-safe');
 require('./verify-product-docs');
 
-console.log('Codex Commit Safe Family v4.9 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v3, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
+console.log('Codex Commit Safe Family v4.10 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v4, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
