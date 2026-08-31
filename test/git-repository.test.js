@@ -18,7 +18,7 @@ const repo = createGitRepository({
     if (args[0] === 'ls-files' && args[1] === '-u') return { stdout: '', stderr: '' };
     if (args[0] === 'log') return { stdout: 'fix(core): repair race\0feat(core): add guard\0chore(core): update metadata\0', stderr: '' };
     if (args[0] === 'ls-tree') return { stdout: '100644 blob deadbeef\t.codex-safe.json\0', stderr: '' };
-    if (args[0] === 'show') return { stdout: '{"schemaVersion":3,"commit":{"language":"en","styleHistoryLimit":12}}', stderr: '' };
+    if (args[0] === 'show') return { stdout: '{"schemaVersion":4,"commit":{"language":"en","styleHistoryLimit":12}}', stderr: '' };
     throw new Error(`unexpected git args: ${args.join(' ')}`);
   },
   runProcessBuffer: async () => ({ stdout: indexBytes, stderr: Buffer.alloc(0) }),
@@ -61,7 +61,7 @@ const repo = createGitRepository({
   const invalidPolicy = createGitRepository({
     runProcess: async (_command, args) => {
       if (args[0] === 'ls-tree') return { stdout: '100644 blob deadbeef\t.codex-safe.json\0', stderr: '' };
-      if (args[0] === 'show') return { stdout: '{"schemaVersion":3,"commit":{"codexPath":"evil"}}', stderr: '' };
+      if (args[0] === 'show') return { stdout: '{"schemaVersion":4,"commit":{"codexPath":"evil"}}', stderr: '' };
       throw new Error('unexpected');
     },
     runProcessBuffer: async () => ({ stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }),
