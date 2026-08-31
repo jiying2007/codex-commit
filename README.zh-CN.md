@@ -37,20 +37,20 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - HEAD/index 变化会使 stale result 失效；
 - 匹配的 Review Receipt v4 可进入 Commit provenance；
 - pending Commit Receipt v4 绑定 HEAD、index、完整 diff、最终 message、policy 和 Review evidence；
-- PR 阶段只有重新计算真实 first-parent commit fingerprint 完全匹配时才承认 provenance；
+- Change 阶段只有重新计算真实 first-parent commit fingerprint 完全匹配时才承认 provenance；
 - Safe Contract v2 使用 ephemeral/read-only/no-approval，并显式关闭 shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency install；
 - 不自动修改源码、Commit 或 Push。
 
-共享安全/runtime 只来自精确 commit-pinned 的 `codex-safe-core` v4 submodule。
+共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.10.0**，SHA 为 `57440a00030941020d5c3e9e01ced3c06062f42e`。
 
 ## Repository Policy
 
-唯一仓库策略文件是 committed `.codex-safe.json`，必须使用 `schemaVersion: 3`：
+唯一仓库策略文件是 committed `.codex-safe.json`，必须使用 `schemaVersion: 4`。Safe Core 统一拥有闭合的 `commit`、`review`、`change`、`reviewService` section；Commit Safe 只消费 Commit Policy，Change 的交付解释由 Codex Change Safe 负责。
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/43e818dc9ae91051f55374a9f9a47b9df6420cd6/codex-safe.schema.json",
-  "schemaVersion": 3,
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/57440a00030941020d5c3e9e01ced3c06062f42e/codex-safe.schema.json",
+  "schemaVersion": 4,
   "commit": {
     "language": "zh-CN",
     "maxDiffBytes": 262144,
@@ -61,7 +61,8 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
     "autoInferScope": true,
     "styleHistoryLimit": 12,
     "timeoutSeconds": 90
-  }
+  },
+  "change": {}
 }
 ```
 
@@ -76,10 +77,14 @@ Codex Review Safe → Review Receipt v4
     ↓
 Codex Commit Safe → Commit Receipt v4
     ↓
-人工 git commit
+人工 git commit / push
+    ↓
+Codex Change Safe → Change Receipt v1
+    ↓
+GitHub PR / GitLab MR
 ```
 
-Commit Safe 可以独立使用；先运行 Review Safe 可以得到更完整的 provenance。PR/MR 创建和元数据由 SCM 原生 UI、CLI 或 API 负责；Codex PR Safe 已退役。
+Commit Safe 可以独立使用；先运行 Review Safe 可以得到更完整的 provenance。**Codex PR Safe** 仅作为旧的模型生成 PR 描述产品身份退役；**Codex Change Safe** 是确定性的后继交付阶段，不恢复旧 Narrative Generator。
 
 ## 安装、升级与验证
 
