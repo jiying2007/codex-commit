@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.2.4 - 2026-08-31
+
+- Publish the already-validated Commit Safe main line on immutable Safe Core v4.10.1 (`76418b80533c644e3ab01045290cd3cdd355622c`) and Policy Schema v4.
+- No Commit generation authority, Safe Contract v2, Commit Receipt v4, Review Receipt v4, prompt contract, or model behavior change.
+
 
 ## 4.2.3
 
