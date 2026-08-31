@@ -12,7 +12,7 @@ async function main() {
   fs.mkdirSync(dist, { recursive: true });
 
   await esbuild.build({
-    entryPoints: [path.join(root, 'extension.js')],
+    entryPoints: [path.join(root, 'src', 'extension-api.js')],
     outfile: path.join(dist, 'extension.js'),
     bundle: true,
     platform: 'node',
