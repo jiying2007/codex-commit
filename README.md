@@ -41,7 +41,7 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - Safe Contract v2 runs Codex ephemeral/read-only/no-approval with shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency installation disabled;
 - no source edit, commit or push side effect.
 
-Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.11.0** submodule at `8375907712db37492aff1ac0d0013e2753b1f6ab`.
+Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.12.0** submodule at `7878dae982088746c06e4fe747b2468e6af274a2`.
 
 ## Repository policy
 
@@ -49,7 +49,7 @@ The only repository policy is committed `.codex-safe.json` with `schemaVersion: 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/8375907712db37492aff1ac0d0013e2753b1f6ab/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/7878dae982088746c06e4fe747b2468e6af274a2/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "en",
@@ -119,3 +119,7 @@ MIT
 ## Codex provider runtime
 
 Codex Commit Safe intentionally ignores `~/.codex/config.toml`. For a relay, configure `safeCodexCommit.providerMode=openai-compatible`, `providerBaseUrl`, and `providerApiKeyEnv`; the key itself stays in the named environment variable. Compatible endpoints use Responses HTTP/SSE. Environment Check performs a real structured round-trip.
+
+## Relay credentials and private-network HTTP
+
+For `openai-compatible` providers, Codex Commit Safe 4.4.0 consumes Core Provider Contract v2. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
