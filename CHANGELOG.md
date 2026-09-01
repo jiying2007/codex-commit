@@ -1,3 +1,9 @@
+## 4.3.0
+
+- Adopt immutable Safe Core 4.11.0 and consume Review Receipt v5 / Judgment Lifecycle v1 provenance.
+- Keep Commit message generation fresh-only; no Judgment replay or model-result persistence is introduced.
+- Treat only current-session Review provenance as current when attaching Review evidence to Commit receipts.
+
 # Changelog
 
 ## 4.2.5

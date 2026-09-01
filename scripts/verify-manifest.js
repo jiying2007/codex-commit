@@ -28,8 +28,8 @@ const EXPECTED_CORE_COMMIT = productContract.safeCoreCommit;
 
 function fail(message) { console.error(`manifest verification failed: ${message}`); process.exit(2); }
 
-if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 4 || REVIEW_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_PROMPT_CONTRACT_VERSION !== 1) {
-  fail('Family v4 requires Safe Core 4, Safe Contract 2, Policy Schema 4, Review/Commit Receipt 4 and Commit Prompt Contract 1.');
+if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERSION !== 4 || REVIEW_RECEIPT_SCHEMA_VERSION !== 5 || COMMIT_RECEIPT_SCHEMA_VERSION !== 4 || COMMIT_PROMPT_CONTRACT_VERSION !== 1) {
+  fail('Family v4 requires Safe Core 4, Safe Contract 2, Policy Schema 4, Review Receipt 5, Commit Receipt 4 and Commit Prompt Contract 1.');
 }
 if (!Array.isArray(POLICY_SECTION_KEYS?.commit) || !Array.isArray(POLICY_SECTION_KEYS?.change)) fail('Core must expose canonical commit/change policy keys.');
 if (typeof scoreEvidenceRisk !== 'function' || typeof adaptiveBudget !== 'function' || typeof estimateRequestTokens !== 'function' || typeof extractImpactSignals !== 'function') fail('Core quality/efficiency exports are missing.');
@@ -87,4 +87,4 @@ for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexC
 require('../src/codex-safe-core/scripts/verify-consumer-product-contract').verify(root, EXPECTED_CORE_COMMIT, 'codex-commit-safe');
 require('./verify-product-docs');
 
-console.log('Codex Commit Safe Family v4.10 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v4, Receipt v4, Prompt Contract v1 and product documentation gates verified.');
+console.log('Codex Commit Safe Family v4.10 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v4, Review Receipt v5 / Commit Receipt v4, Prompt Contract v1 and product documentation gates verified.');
