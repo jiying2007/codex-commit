@@ -1,0 +1,109 @@
+name: Provider V2 Migrate Once
+
+on:
+  push:
+    branches: [family/provider-contract-v2]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: family/provider-contract-v2
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-node@e51e5fe84fc33b4c73ebe40526b2694712b5b858
+        with:
+          node-version: '22.22.2'
+      - name: Apply product migration
+        env:
+          CORE_SHA: 7878dae982088746c06e4fe747b2468e6af274a2
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          function readJson(file){return JSON.parse(fs.readFileSync(file,'utf8'));}
+          function writeJson(file,value){fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');}
+          function replaceOnce(text, from, to, file){
+            if(!text.includes(from)) throw new Error(`${file}: migration anchor missing: ${from}`);
+            return text.replace(from,to);
+          }
+          const pkg=readJson('package.json');
+          pkg.version='4.4.0';
+          const props=pkg.contributes.configuration.properties;
+          props['safeCodexCommit.providerBaseUrl'].description='Base URL for openai-compatible mode. HTTPS is the default; non-loopback HTTP requires providerAllowInsecureHttp=true.';
+          const next={};
+          for(const [key,value] of Object.entries(props)){
+            next[key]=value;
+            if(key==='safeCodexCommit.providerApiKeyEnv'){
+              next['safeCodexCommit.providerCredentialSource']={
+                type:'string', enum:['auto','env','auth-json'], default:'auto', scope:'application',
+                description:'Credential source for compatible providers. auto prefers the configured environment variable, then CODEX_HOME/auth.json or ~/.codex/auth.json.'
+              };
+              next['safeCodexCommit.providerAllowInsecureHttp']={
+                type:'boolean', default:false, scope:'application',
+                description:'Explicitly allow non-loopback HTTP for a trusted private-network relay. Keep disabled for Internet endpoints.'
+              };
+            }
+          }
+          pkg.contributes.configuration.properties=next;
+          writeJson('package.json',pkg);
+
+          const contract=readJson('product-contract.json');
+          contract.productVersion='4.4.0';
+          contract.safeCoreVersion='4.12.0';
+          contract.safeCoreCommit=process.env.CORE_SHA;
+          contract.codexRuntimeVersion=2;
+          contract.providerContractVersion=2;
+          writeJson('product-contract.json',contract);
+
+          let policy=fs.readFileSync('src/policy.js','utf8');
+          policy=replaceOnce(policy,
+            "          apiKeyEnv: String(getUserOnlySetting(config, 'providerApiKeyEnv', 'OPENAI_API_KEY') || '').trim()\n",
+            "          apiKeyEnv: String(getUserOnlySetting(config, 'providerApiKeyEnv', 'OPENAI_API_KEY') || '').trim(),\n          credentialSource: String(getUserOnlySetting(config, 'providerCredentialSource', 'auto') || 'auto').trim(),\n          allowInsecureHttp: Boolean(getUserOnlySetting(config, 'providerAllowInsecureHttp', false))\n",
+            'src/policy.js');
+          fs.writeFileSync('src/policy.js',policy);
+
+          let test=fs.readFileSync('test.js','utf8');
+          test=replaceOnce(test,
+            "const { getUserOnlySetting } = require('./src/policy');",
+            "const { getUserOnlySetting, createCommitPolicy } = require('./src/policy');",
+            'test.js');
+          const anchor="assert.strictEqual(getUserOnlySetting(fakeConfig, 'codexPath', 'codex'), '/usr/local/bin/codex');\n";
+          const addition=`${anchor}\nconst runtimeValues = {\n  providerMode: 'openai-compatible',\n  providerBaseUrl: 'http://192.168.2.109:3000/v1',\n  providerApiKeyEnv: 'RELAY_API_KEY',\n  providerCredentialSource: 'auth-json',\n  providerAllowInsecureHttp: true\n};\nconst runtimeConfig = { inspect(key) { return { defaultValue: undefined, globalValue: runtimeValues[key] }; } };\nconst runtimePolicy = createCommitPolicy({ ui: (_zh, en) => en, readProjectRulesAtHead: async () => ({ rules: {}, source: '<none>', fingerprint: '<none>' }) });\nconst relayRuntime = runtimePolicy.runtimeOptions(runtimeConfig, {});\nassert.strictEqual(relayRuntime.provider.credentialSource, 'auth-json');\nassert.strictEqual(relayRuntime.provider.allowInsecureHttp, true);\nassert.strictEqual(relayRuntime.provider.baseUrl, 'http://192.168.2.109:3000/v1');\n`;
+          test=replaceOnce(test,anchor,addition,'test.js');
+          const finalAnchor="console.log(`Codex Commit Safe ${pkg.version} product-boundary tests passed.`);";
+          const configChecks=`const providerProperties = pkg.contributes.configuration.properties;\nassert.deepStrictEqual(providerProperties['safeCodexCommit.providerCredentialSource'].enum, ['auto', 'env', 'auth-json']);\nassert.strictEqual(providerProperties['safeCodexCommit.providerCredentialSource'].default, 'auto');\nassert.strictEqual(providerProperties['safeCodexCommit.providerAllowInsecureHttp'].default, false);\n\n${finalAnchor}`;
+          test=replaceOnce(test,finalAnchor,configChecks,'test.js');
+          fs.writeFileSync('test.js',test);
+
+          const noteEn=`\n## Relay credentials and private-network HTTP\n\nFor \`openai-compatible\` providers, Codex Commit Safe 4.4.0 consumes Core Provider Contract v2. \`providerCredentialSource=auto\` first uses \`providerApiKeyEnv\`, then falls back to \`${CODEX_HOME}/auth.json\` or \`~/.codex/auth.json\`; \`auth-json\` requires \`auth_mode=apikey\` and \`OPENAI_API_KEY\`. Non-loopback \`http://\` endpoints are rejected unless \`providerAllowInsecureHttp=true\` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.\n`;
+          const noteZh=`\n## 中转站凭据与局域网 HTTP\n\n\`openai-compatible\` Provider 从 Codex Commit Safe 4.4.0 起统一消费 Core Provider Contract v2。\`providerCredentialSource=auto\` 会先读取 \`providerApiKeyEnv\` 指定的环境变量，不存在时再读取 \`${CODEX_HOME}/auth.json\` 或 \`~/.codex/auth.json\`；\`auth-json\` 只接受 \`auth_mode=apikey\` 与 \`OPENAI_API_KEY\`。非 loopback 的 \`http://\` 地址默认拒绝，只有在用户/应用设置显式开启 \`providerAllowInsecureHttp=true\` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。\n`;
+          for(const [file,note] of [['README.md',noteEn],['README.zh-CN.md',noteZh]]){
+            let text=fs.readFileSync(file,'utf8');
+            if(!text.includes('providerCredentialSource')) text += note;
+            fs.writeFileSync(file,text);
+          }
+          let changelog=fs.readFileSync('CHANGELOG.md','utf8');
+          if(!changelog.includes('## 4.4.0 - 2026-09-01')){
+            changelog=changelog.replace(/^# Changelog\n/,`# Changelog\n\n## 4.4.0 - 2026-09-01\n\n### Provider Contract v2\n\n- Pin Codex Safe Core 4.12.0 and consume Runtime/Provider Contract v2.\n- Add direct Codex auth.json API-key credential resolution through auto/env/auth-json modes.\n- Add explicit trusted-private-network HTTP opt-in while keeping HTTPS default and repository policy unable to weaken transport.\n- Keep credentials out of settings, argv, receipts and diagnostics.\n`);
+          }
+          fs.writeFileSync('CHANGELOG.md',changelog);
+          NODE
+          git -C src/codex-safe-core fetch origin "$CORE_SHA"
+          git -C src/codex-safe-core checkout --detach "$CORE_SHA"
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          node scripts/verify-lock.js
+          rm .github/workflows/provider-v2-migrate-once.yml
+          git config user.name codex-safe-family-bot
+          git config user.email codex-safe-family-bot@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(commit): support auth.json relay credentials"
+          git push origin HEAD:family/provider-contract-v2
