@@ -34,7 +34,9 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
       ? {
           mode: providerMode,
           baseUrl: String(getUserOnlySetting(config, 'providerBaseUrl', '') || '').trim(),
-          apiKeyEnv: String(getUserOnlySetting(config, 'providerApiKeyEnv', 'OPENAI_API_KEY') || '').trim()
+          apiKeyEnv: String(getUserOnlySetting(config, 'providerApiKeyEnv', 'OPENAI_API_KEY') || '').trim(),
+          credentialSource: String(getUserOnlySetting(config, 'providerCredentialSource', 'auto') || 'auto').trim(),
+          allowInsecureHttp: Boolean(getUserOnlySetting(config, 'providerAllowInsecureHttp', false))
         }
       : { mode: providerMode };
     const projectOperationSeconds = project.timeoutSeconds === undefined

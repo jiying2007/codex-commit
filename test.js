@@ -20,7 +20,7 @@ const path = require('path');
 const { isChineseUi, ui } = require('./src/ui');
 const { inferScope } = require('./src/scope-intelligence');
 const { createPolicyValidators } = require('./src/policy-validation');
-const { getUserOnlySetting } = require('./src/policy');
+const { getUserOnlySetting, createCommitPolicy } = require('./src/policy');
 const pkg = require('./package.json');
 
 fakeVscode.env.language = 'en';
@@ -58,6 +58,20 @@ const fakeConfig = {
 };
 assert.strictEqual(getUserOnlySetting(fakeConfig, 'codexPath', 'codex'), '/usr/local/bin/codex');
 
+const runtimeValues = {
+  providerMode: 'openai-compatible',
+  providerBaseUrl: 'http://192.168.2.109:3000/v1',
+  providerApiKeyEnv: 'RELAY_API_KEY',
+  providerCredentialSource: 'auth-json',
+  providerAllowInsecureHttp: true
+};
+const runtimeConfig = { inspect(key) { return { defaultValue: undefined, globalValue: runtimeValues[key] }; } };
+const runtimePolicy = createCommitPolicy({ ui: (_zh, en) => en, readProjectRulesAtHead: async () => ({ rules: {}, source: '<none>', fingerprint: '<none>' }) });
+const relayRuntime = runtimePolicy.runtimeOptions(runtimeConfig, {});
+assert.strictEqual(relayRuntime.provider.credentialSource, 'auth-json');
+assert.strictEqual(relayRuntime.provider.allowInsecureHttp, true);
+assert.strictEqual(relayRuntime.provider.baseUrl, 'http://192.168.2.109:3000/v1');
+
 const extensionSource = fs.readFileSync(path.join(__dirname, 'extension.js'), 'utf8');
 assert.doesNotMatch(extensionSource, /\b__test\b/, 'extension.__test must not return');
 for (const modulePath of ['./src/ui', './src/policy', './src/repository-ui', './src/review-evidence']) {
@@ -88,5 +102,10 @@ for (const command of ['safeCodexCommit.generate', 'safeCodexCommit.regenerate',
   const item = (pkg.contributes?.menus?.commandPalette || []).find(entry => entry.command === command);
   assert.match(String(item?.when || ''), /isWorkspaceTrusted/, `${command} must require workspace trust`);
 }
+
+const providerProperties = pkg.contributes.configuration.properties;
+assert.deepStrictEqual(providerProperties['safeCodexCommit.providerCredentialSource'].enum, ['auto', 'env', 'auth-json']);
+assert.strictEqual(providerProperties['safeCodexCommit.providerCredentialSource'].default, 'auto');
+assert.strictEqual(providerProperties['safeCodexCommit.providerAllowInsecureHttp'].default, false);
 
 console.log(`Codex Commit Safe ${pkg.version} product-boundary tests passed.`);
