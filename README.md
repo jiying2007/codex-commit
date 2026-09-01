@@ -35,13 +35,13 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - Safe Core Semantic Context Budget handles source/generated/binary files predictably;
 - Structured Output is schema/semantics validated before entering the SCM input;
 - HEAD/index changes invalidate stale results;
-- matching Review Receipt v4 can be incorporated into Commit provenance;
+- matching Review Receipt v5 can be incorporated into Commit provenance;
 - pending Commit Receipt v4 binds HEAD, index, full diff, final message, policy and review evidence;
 - later Change evidence is accepted only after recomputing the real first-parent commit fingerprints;
 - Safe Contract v2 runs Codex ephemeral/read-only/no-approval with shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency installation disabled;
 - no source edit, commit or push side effect.
 
-Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.10.2** submodule at `cd9788f1280a217fbe6d0beb59682a85a8b82c4d`.
+Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.11.0** submodule at `8375907712db37492aff1ac0d0013e2753b1f6ab`.
 
 ## Repository policy
 
@@ -49,7 +49,7 @@ The only repository policy is committed `.codex-safe.json` with `schemaVersion: 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/cd9788f1280a217fbe6d0beb59682a85a8b82c4d/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/8375907712db37492aff1ac0d0013e2753b1f6ab/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "en",
@@ -73,7 +73,7 @@ Only policy committed in HEAD is effective. `maxDiffBytes` is the model semantic
 ```text
 staged changes
     ↓
-Codex Review Safe → Review Receipt v4
+Codex Review Safe → Review Receipt v5
     ↓
 Codex Commit Safe → Commit Receipt v4
     ↓

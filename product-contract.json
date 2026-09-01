@@ -1,9 +1,9 @@
 {
   "productContractVersion": 1,
   "productId": "codex-commit-safe",
-  "productVersion": "4.2.5",
-  "safeCoreVersion": "4.10.2",
-  "safeCoreCommit": "cd9788f1280a217fbe6d0beb59682a85a8b82c4d",
+  "productVersion": "4.3.0",
+  "safeCoreVersion": "4.11.0",
+  "safeCoreCommit": "8375907712db37492aff1ac0d0013e2753b1f6ab",
   "safeCoreMajorVersion": 4,
   "safeContractVersion": 2,
   "policySchemaVersion": 4,
@@ -14,6 +14,7 @@
     24
   ],
   "commitReceiptVersion": 4,
-  "reviewReceiptVersion": 4,
-  "commitPromptContractVersion": 1
+  "reviewReceiptVersion": 5,
+  "commitPromptContractVersion": 1,
+  "judgmentLifecycleVersionConsumed": 1
 }

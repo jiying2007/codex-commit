@@ -3,7 +3,7 @@
 const Module = require('module');
 const originalLoad = Module._load;
 const receipt = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   kind: 'codex-review',
   subject: {
     type: 'git-index',
@@ -13,6 +13,8 @@ const receipt = {
   },
   diffFingerprint: '3'.repeat(64),
   policyFingerprint: '<none>',
+  reviewSubjectFingerprint: '4'.repeat(64),
+  evidenceManifestDigest: '5'.repeat(64),
   qualityVerdict: 'no_findings',
   readinessVerdict: 'needs_evidence',
   mechanicalGate: 'pass',
@@ -40,18 +42,22 @@ const { getReviewEvidence } = require('../src/review-evidence');
     indexFingerprint: receipt.subject.indexFingerprint
   });
   assert.strictEqual(current.status, 'current');
-  assert.strictEqual(current.receipt.schemaVersion, 4);
+  assert.strictEqual(current.receipt.schemaVersion, 5);
   assert.strictEqual(current.receipt.safeCoreVersion, 4);
   assert.strictEqual(current.receipt.promptContractVersion, 1);
   assert.strictEqual(current.receipt.kind, 'codex-review');
   assert.strictEqual(current.receipt.subject.type, 'git-index');
+  assert.strictEqual(current.receipt.reviewSubjectFingerprint, receipt.reviewSubjectFingerprint);
+  assert.strictEqual(current.receipt.evidenceManifestDigest, receipt.evidenceManifestDigest);
 
-  assert.strictEqual(validateReviewReceipt({ ...receipt, schemaVersion: 3 }), null, 'Family v4 must not accept Review Receipt v3');
+  assert.strictEqual(validateReviewReceipt({ ...receipt, schemaVersion: 4 }), null, 'Review Receipt v4 must stay invalid after the v5 hard cut');
+  assert.strictEqual(validateReviewReceipt({ ...receipt, reviewSubjectFingerprint: undefined }), null, 'Receipt v5 must bind ReviewSubject identity');
+  assert.strictEqual(validateReviewReceipt({ ...receipt, evidenceManifestDigest: undefined }), null, 'Receipt v5 must bind Evidence Manifest identity');
   assert.strictEqual(validateReviewReceipt({ ...receipt, kind: 'codex-review-safe' }), null, 'legacy Review Receipt kind must stay invalid');
 
   extension = undefined;
   assert.strictEqual((await getReviewEvidence('/repo', {})).status, 'unavailable');
-  console.log('Review Receipt v4 evidence adapter tests passed.');
+  console.log('Review Receipt v5 evidence adapter tests passed.');
 })().catch(error => {
   console.error(error);
   process.exit(1);
