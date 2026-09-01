@@ -6,7 +6,7 @@
 
 ## 快速开始
 
-适合在 Stage 完成后生成 Commit Message；如果先使用 Codex Review Safe，还可以把匹配的 Review Receipt v4 纳入 Commit provenance。插件只写 SCM Commit Message 输入框，**不会执行 `git commit`、不会 push、不会修改源码**。
+适合在 Stage 完成后生成 Commit Message；如果先使用 Codex Review Safe，还可以把匹配的 Review Receipt v5 纳入 Commit provenance。插件只写 SCM Commit Message 输入框，**不会执行 `git commit`、不会 push、不会修改源码**。
 
 环境要求：
 
@@ -35,13 +35,13 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - Safe Core Semantic Context Budget 对 source/generated/binary 文件做确定性预算；
 - Structured Output 通过本地 schema/语义校验后才写 SCM 输入框；
 - HEAD/index 变化会使 stale result 失效；
-- 匹配的 Review Receipt v4 可进入 Commit provenance；
+- 匹配的 Review Receipt v5 可进入 Commit provenance；
 - pending Commit Receipt v4 绑定 HEAD、index、完整 diff、最终 message、policy 和 Review evidence；
 - Change 阶段只有重新计算真实 first-parent commit fingerprint 完全匹配时才承认 provenance；
 - Safe Contract v2 使用 ephemeral/read-only/no-approval，并显式关闭 shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency install；
 - 不自动修改源码、Commit 或 Push。
 
-共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.10.2**，SHA 为 `cd9788f1280a217fbe6d0beb59682a85a8b82c4d`。
+共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.11.0**，SHA 为 `8375907712db37492aff1ac0d0013e2753b1f6ab`。
 
 ## Repository Policy
 
@@ -49,7 +49,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/cd9788f1280a217fbe6d0beb59682a85a8b82c4d/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/8375907712db37492aff1ac0d0013e2753b1f6ab/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "zh-CN",
@@ -73,7 +73,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 ```text
 staged changes
     ↓
-Codex Review Safe → Review Receipt v4
+Codex Review Safe → Review Receipt v5
     ↓
 Codex Commit Safe → Commit Receipt v4
     ↓
