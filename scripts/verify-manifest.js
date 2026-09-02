@@ -17,7 +17,9 @@ const {
   extractImpactSignals,
   normalizeCodexRuntimeOptions,
   providerConfigOverrides,
-  classifyCodexFailure
+  classifyCodexFailure,
+  resolveCodexRuntime,
+  inspectCodexRuntime
 } = require('../src/codex-safe-core');
 
 const root = path.resolve(__dirname, '..');
@@ -34,6 +36,7 @@ if (SAFE_CORE_VERSION !== 4 || SAFE_CONTRACT_VERSION !== 2 || POLICY_SCHEMA_VERS
 if (!Array.isArray(POLICY_SECTION_KEYS?.commit) || !Array.isArray(POLICY_SECTION_KEYS?.change)) fail('Core must expose canonical commit/change policy keys.');
 if (typeof scoreEvidenceRisk !== 'function' || typeof adaptiveBudget !== 'function' || typeof estimateRequestTokens !== 'function' || typeof extractImpactSignals !== 'function') fail('Core quality/efficiency exports are missing.');
 if (typeof normalizeCodexRuntimeOptions !== 'function' || typeof providerConfigOverrides !== 'function' || typeof classifyCodexFailure !== 'function') fail('Core Codex Runtime/Provider Contract exports are missing.');
+if (typeof resolveCodexRuntime !== 'function' || typeof inspectCodexRuntime !== 'function') fail('Core Runtime Contract v3 resolver/inspection exports are missing.');
 if (!fs.existsSync(schemaPath)) fail('canonical Codex Safe schema is missing from the Core submodule.');
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
@@ -81,10 +84,20 @@ if (fs.existsSync(path.join(root, 'tsconfig.pure.json'))) fail('tsconfig.pure.js
 
 if (JSON.stringify(pkg.extensionKind) !== JSON.stringify(['workspace'])) fail('extensionKind must be ["workspace"].');
 const properties = pkg.contributes?.configuration?.properties || {};
-if (properties['safeCodexCommit.codexPath']?.scope !== 'machine') fail('safeCodexCommit.codexPath must use machine scope.');
-for (const [key, value] of Object.entries(properties)) { if (key !== 'safeCodexCommit.codexPath' && value.scope !== 'application') fail(`${key} must use application scope.`); }
+const machineScoped = new Set([
+  'safeCodexCommit.codexPath',
+  'safeCodexCommit.providerMode',
+  'safeCodexCommit.providerBaseUrl',
+  'safeCodexCommit.providerApiKeyEnv',
+  'safeCodexCommit.providerCredentialSource',
+  'safeCodexCommit.providerAllowInsecureHttp'
+]);
+for (const [key, value] of Object.entries(properties)) {
+  const expected = machineScoped.has(key) ? 'machine' : 'application';
+  if (value.scope !== expected) fail(`${key} must use ${expected} scope.`);
+}
 
 require('../src/codex-safe-core/scripts/verify-consumer-product-contract').verify(root, EXPECTED_CORE_COMMIT, 'codex-commit-safe');
 require('./verify-product-docs');
 
-console.log('Codex Commit Safe Family v4.10 ownership, exact Core/schema pin, shared runtime provider, Token efficiency, Policy v4, Review Receipt v5 / Commit Receipt v4, Prompt Contract v1 and product documentation gates verified.');
+console.log('Codex Commit Safe Family v4.13 ownership, exact Core/schema pin, Runtime Contract v3 resolver, machine-local provider overrides, Token efficiency, Policy v4, Review Receipt v5 / Commit Receipt v4, Prompt Contract v1 and product documentation gates verified.');
