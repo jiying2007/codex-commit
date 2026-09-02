@@ -5,34 +5,43 @@ on:
 permissions:
   contents: write
 jobs:
-  repin:
+  patch-settings:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: true
           fetch-depth: 0
-          submodules: recursive
       - uses: actions/setup-node@e51e5fe84fc33b4c73ebe40526b2694712b5b858
         with: { node-version: '24.19.0' }
-      - name: Repin and prepare 4.5.0
+      - name: Patch runtime settings
         shell: bash
         run: |
           set -euo pipefail
-          CORE=d95f67cc61ce66c16e2aa440829655919e906a75
-          git -C src/codex-safe-core fetch origin "$CORE"
-          git -C src/codex-safe-core checkout --detach "$CORE"
-          node src/codex-safe-core/scripts/repin-consumer.js . "$CORE"
-          git checkout HEAD -- .github/workflows/family-release-guard.yml || true
-          npm version 4.5.0 --no-git-tag-version
           node <<'NODE'
           const fs=require('fs');
-          const p='product-contract.json'; const c=JSON.parse(fs.readFileSync(p,'utf8'));
-          c.productVersion='4.5.0'; c.codexRuntimeVersion=3; c.providerContractVersion=3;
-          fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');
+          const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+          const p=pkg.contributes.configuration.properties;
+          const mode=p['safeCodexCommit.providerMode'];
+          mode.enum=['auto','openai','openai-compatible'];
+          mode.default='auto';
+          mode.scope='machine';
+          mode.description='Runtime selection. Auto (recommended) inherits the machine Family Runtime or Codex CLI provider; other values are advanced machine-local overrides.';
+          for(const key of ['providerBaseUrl','providerApiKeyEnv','providerCredentialSource','providerAllowInsecureHttp']) p['safeCodexCommit.'+key].scope='machine';
+          p['safeCodexCommit.providerBaseUrl'].description='Advanced override only: base URL for explicit openai-compatible mode. Auto normally inherits the machine Codex/Family Runtime.';
+          p['safeCodexCommit.providerApiKeyEnv'].description='Advanced override only: provider credential environment-variable name. Secret values are never stored in settings.';
+          p['safeCodexCommit.providerCredentialSource'].description='Advanced override only. Auto runtime discovery reuses the machine credential contract.';
+          p['safeCodexCommit.providerAllowInsecureHttp'].description='Advanced override only. Auto can inherit machine-owned literal private-IP HTTP and surfaces a plaintext warning.';
+          const resolverCheck='node --check src/codex-safe-core/codex-runtime-resolver.js';
+          if(!pkg.scripts.check.includes(resolverCheck)) pkg.scripts.check=pkg.scripts.check.replace('node --check src/codex-safe-core/codex-cli.js',resolverCheck+' && node --check src/codex-safe-core/codex-cli.js');
+          if(!pkg.scripts.check.includes('node test/runtime-auto.test.js')) pkg.scripts.check += ' && node test/runtime-auto.test.js';
+          if(!pkg.scripts['test:unit'].includes('node test/runtime-auto.test.js')) pkg.scripts['test:unit'] += ' && node test/runtime-auto.test.js';
+          fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
           NODE
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'chore(core): repin Commit 4.5.0 to Core 4.13.0'
-          git push origin HEAD:feat/runtime-auto-4.5.0
+          if ! git diff --quiet -- package.json; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add package.json
+            git commit -m 'feat(runtime): default Commit provider selection to auto'
+            git push origin HEAD:feat/runtime-auto-4.5.0
+          fi
