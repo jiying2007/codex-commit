@@ -123,3 +123,7 @@ Codex Commit Safe intentionally ignores `~/.codex/config.toml`. For a relay, con
 ## Relay credentials and private-network HTTP
 
 For `openai-compatible` providers, Codex Commit Safe 4.4.1 consumes Core Provider Contract v2. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
+
+## Runtime Contract v3 — zero-config
+
+Commit defaults to **Auto** runtime discovery. If `codex` already works in the current VS Code Extension Host, Commit reuses machine Family Runtime (`~/.codex-safe/runtime.json`) or machine Codex configuration (`${CODEX_HOME}/config.toml` / `~/.codex/config.toml`) without re-entering the relay URL. In Remote SSH the workspace extension runs remotely, so the config and `auth.json` are read from the remote Linux account. Literal private-IP HTTP relays are inherited with a plaintext warning; public/non-IP HTTP remains fail-closed. VS Code provider settings are machine-scoped advanced overrides.
