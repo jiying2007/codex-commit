@@ -22,8 +22,7 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
           import re
-          p=Path('extension.js')
-          s=p.read_text()
+          p=Path('extension.js'); s=p.read_text()
           if 'Extension Host:' not in s:
               pattern=r"async function checkEnvironment\(\) \{.*?\n\}\n\nfunction activate"
               replacement=r'''async function checkEnvironment() {
@@ -33,28 +32,15 @@ jobs:
             const headOid = await getHeadOid(repoRoot);
             const options = await getEffectiveOptions(repoRoot, headOid);
             const runtime = await probeCodexRuntime({ codexPath: options.codexPath, model: options.model, runtime: options.codexRuntime });
-
             let gitVersion = '';
-            try {
-              gitVersion = (await runProcess('git', ['--version'], { timeoutMs: 10000 })).stdout.trim();
-            } catch {
-              throw new Error(ui(
-                '找不到 Git。请确认 git --version 可正常执行。',
-                'Git was not found. Make sure git --version runs successfully.'
-              ));
-            }
+            try { gitVersion = (await runProcess('git', ['--version'], { timeoutMs: 10000 })).stdout.trim(); }
+            catch { throw new Error(ui('找不到 Git。请确认 git --version 可正常执行。', 'Git was not found. Make sure git --version runs successfully.')); }
             const inspection = options.codexRuntimeInspection || {};
             const endpoint = runtime.provider.endpointHost || 'Codex default';
             const remoteName = vscode.env.remoteName || '';
             const hostLabel = remoteName ? `Remote (${remoteName})` : 'Local';
             const configLabel = inspection.configPath || 'built-in OpenAI';
-            const credentialLabel = runtime.provider.mode === 'openai'
-              ? 'Codex managed auth'
-              : inspection.credentialEnvPresent
-                ? `env:${inspection.credentialEnv}`
-                : inspection.authJsonPresent
-                  ? inspection.authJsonPath
-                  : `missing (${inspection.credentialEnv || 'provider credential'})`;
+            const credentialLabel = runtime.provider.mode === 'openai' ? 'Codex managed auth' : inspection.credentialEnvPresent ? `env:${inspection.credentialEnv}` : inspection.authJsonPresent ? inspection.authJsonPath : `missing (${inspection.credentialEnv || 'provider credential'})`;
             log(`Extension Host: ${hostLabel}`);
             log(`Runtime source: ${inspection.source || 'explicit'}; config=${configLabel}`);
             log(`Provider: ${runtime.provider.mode}; endpoint=${endpoint}; transport=${inspection.transport || 'managed'}`);
@@ -69,11 +55,10 @@ jobs:
 
           function activate'''
               s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
-              if n != 1:
-                  raise SystemExit('Commit Doctor anchor not found')
+              if n != 1: raise SystemExit('Commit Doctor anchor not found')
               p.write_text(s2)
 
-          Path('test/runtime-auto.test.js').write_text(r'''\'use strict\';
+          Path('test/runtime-auto.test.js').write_text("""'use strict';
           const test=require('node:test');
           const assert=require('node:assert/strict');
           const fs=require('node:fs');
@@ -90,23 +75,21 @@ jobs:
           test('Commit delegates provider inheritance to Core Runtime Contract v3',()=>{
             const source=read('src/policy.js');
             assert.match(source,/codex-runtime-resolver/);
-            assert.match(source,/resolveCodexRuntime\(codexRuntimeSelection\)/);
-            assert.match(source,/inspectCodexRuntime\(codexRuntimeSelection\)/);
+            assert.match(source,/resolveCodexRuntime\\(codexRuntimeSelection\\)/);
+            assert.match(source,/inspectCodexRuntime\\(codexRuntimeSelection\\)/);
             assert.match(source,/providerMode', 'auto'/);
           });
           test('Commit Doctor exposes Remote Extension Host and redacted runtime source',()=>{
             const source=read('extension.js');
-            assert.match(source,/vscode\.env\.remoteName/);
+            assert.match(source,/vscode\\.env\\.remoteName/);
             assert.match(source,/Extension Host:/);
             assert.match(source,/Credential source:/);
-            assert.doesNotMatch(source,/credentialLabel\s*=.*\.value/);
+            assert.doesNotMatch(source,/credentialLabel\\s*=.*\\.value/);
           });
-          ''')
-
+          """)
           def append_once(file, marker, block):
               path=Path(file); text=path.read_text()
-              if marker not in text:
-                  path.write_text(text.rstrip()+"\n\n"+block.strip()+"\n")
+              if marker not in text: path.write_text(text.rstrip()+"\n\n"+block.strip()+"\n")
           append_once('README.md','Runtime Contract v3 — zero-config',r'''## Runtime Contract v3 — zero-config
 
           Commit defaults to **Auto** runtime discovery. If `codex` already works in the current VS Code Extension Host, Commit reuses machine Family Runtime (`~/.codex-safe/runtime.json`) or machine Codex configuration (`${CODEX_HOME}/config.toml` / `~/.codex/config.toml`) without re-entering the relay URL. In Remote SSH the workspace extension runs remotely, so the config and `auth.json` are read from the remote Linux account. Literal private-IP HTTP relays are inherited with a plaintext warning; public/non-IP HTTP remains fail-closed. VS Code provider settings are machine-scoped advanced overrides.''')
@@ -123,6 +106,6 @@ jobs:
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add extension.js test/runtime-auto.test.js README.md README.zh-CN.md CHANGELOG.md
-            git commit -m 'feat(runtime): surface Commit runtime source in Remote SSH'
+            git commit -m 'feat(runtime): complete Commit Remote SSH zero-config UX'
             git push origin HEAD:feat/runtime-auto-4.5.0
           fi
