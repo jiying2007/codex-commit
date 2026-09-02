@@ -122,4 +122,4 @@ Codex Commit Safe 会主动忽略 `~/.codex/config.toml`。中转站使用 `safe
 
 ## 中转站凭据与局域网 HTTP
 
-`openai-compatible` Provider 从 Codex Commit Safe 4.4.0 起统一消费 Core Provider Contract v2。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。
+`openai-compatible` Provider 从 Codex Commit Safe 4.4.1 起统一消费 Core Provider Contract v2。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。

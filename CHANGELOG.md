@@ -6,6 +6,10 @@
 
 # Changelog
 
+## 4.4.1 - 2026-09-02
+
+- Release-only patch carrying the exact Codex Safe Core 4.12.4 family pin and validated commit/runtime contracts; no Commit Safe runtime semantics change.
+
 ## 4.2.5
 
 - Align the primary VS Code SCM toolbar with the Family UI Contract: Commit is the single `navigation@6` primary action after Review.
