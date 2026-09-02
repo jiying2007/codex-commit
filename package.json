@@ -2,7 +2,7 @@
   "name": "codex-commit-safe",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "4.4.1",
+  "version": "4.5.0",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -109,24 +109,25 @@
         "safeCodexCommit.providerMode": {
           "type": "string",
           "enum": [
+            "auto",
             "openai",
             "openai-compatible"
           ],
-          "default": "openai",
-          "scope": "application",
-          "description": "Codex provider runtime: built-in OpenAI or an explicitly configured OpenAI-compatible Responses endpoint."
+          "default": "auto",
+          "scope": "machine",
+          "description": "Runtime selection. Auto (recommended) inherits the machine Family Runtime or Codex CLI provider; other values are advanced machine-local overrides."
         },
         "safeCodexCommit.providerBaseUrl": {
           "type": "string",
           "default": "",
-          "scope": "application",
-          "description": "Base URL for openai-compatible mode. HTTPS is the default; non-loopback HTTP requires providerAllowInsecureHttp=true."
+          "scope": "machine",
+          "description": "Advanced override only: base URL for explicit openai-compatible mode. Auto normally inherits the machine Codex/Family Runtime."
         },
         "safeCodexCommit.providerApiKeyEnv": {
           "type": "string",
           "default": "OPENAI_API_KEY",
-          "scope": "application",
-          "description": "Environment-variable name containing the provider API key; the secret value is never stored in settings."
+          "scope": "machine",
+          "description": "Advanced override only: provider credential environment-variable name. Secret values are never stored in settings."
         },
         "safeCodexCommit.providerCredentialSource": {
           "type": "string",
@@ -136,14 +137,14 @@
             "auth-json"
           ],
           "default": "auto",
-          "scope": "application",
-          "description": "Credential source for compatible providers. auto prefers the configured environment variable, then CODEX_HOME/auth.json or ~/.codex/auth.json."
+          "scope": "machine",
+          "description": "Advanced override only. Auto runtime discovery reuses the machine credential contract."
         },
         "safeCodexCommit.providerAllowInsecureHttp": {
           "type": "boolean",
           "default": false,
-          "scope": "application",
-          "description": "Explicitly allow non-loopback HTTP for a trusted private-network relay. Keep disabled for Internet endpoints."
+          "scope": "machine",
+          "description": "Advanced override only. Auto can inherit machine-owned literal private-IP HTTP and surfaces a plaintext warning."
         },
         "safeCodexCommit.connectTimeoutSeconds": {
           "type": "number",
@@ -293,8 +294,8 @@
     "pretest": "npm run core:init",
     "prebuild": "npm run core:init",
     "prepackage": "npm run core:init",
-    "check": "node --check extension.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check src/impact-scope.js && node --check src/policy-validation.js && node --check src/git-repository.js && node --check src/receipts.js && node --check src/codex-safe-core/safe-contract.js && node --check src/codex-safe-core/codex-cli.js && node --check src/codex-safe-core/process-runner.js && node --check src/codex-safe-core/git-repository.js && node --check src/codex-safe-core/policy.js && node --check src/codex-safe-core/context-builder.js && node --check src/codex-safe-core/quality-platform.js && node --check src/commit-runtime.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node src/codex-safe-core/scripts/verify-family-ui-contract.js . && node scripts/release.test.js && npm run governance && npm run test:unit && npm run build",
-    "test:unit": "node test.js && node test/review-evidence.test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && node test/policy-validation.test.js && node test/git-repository.test.js && node test/commit-runtime.test.js && node test/receipts.test.js && node test/impact-scope.test.js",
+    "check": "node --check extension.js && node --check src/ui.js && node --check src/policy.js && node --check src/repository-ui.js && node --check src/review-evidence.js && node --check src/commit-style.js && node --check src/scope-intelligence.js && node --check src/impact-scope.js && node --check src/policy-validation.js && node --check src/git-repository.js && node --check src/receipts.js && node --check src/codex-safe-core/safe-contract.js && node --check src/codex-safe-core/codex-runtime-resolver.js && node --check src/codex-safe-core/codex-cli.js && node --check src/codex-safe-core/process-runner.js && node --check src/codex-safe-core/git-repository.js && node --check src/codex-safe-core/policy.js && node --check src/codex-safe-core/context-builder.js && node --check src/codex-safe-core/quality-platform.js && node --check src/commit-runtime.js && node --check scripts/build.js && node --check scripts/release.js && node --check scripts/verify-manifest.js && node scripts/verify-manifest.js && node src/codex-safe-core/scripts/verify-family-ui-contract.js . && node scripts/release.test.js && npm run governance && npm run test:unit && npm run build && node test/runtime-auto.test.js",
+    "test:unit": "node test.js && node test/review-evidence.test.js && node test/commit-style.test.js && node test/scope-intelligence.test.js && node test/policy-validation.test.js && node test/git-repository.test.js && node test/commit-runtime.test.js && node test/receipts.test.js && node test/impact-scope.test.js && node test/runtime-auto.test.js",
     "test:integration": "npm run build && node ./test/integration/runTest.js",
     "test": "npm run test:unit",
     "package": "npm run build && vsce package --no-dependencies",

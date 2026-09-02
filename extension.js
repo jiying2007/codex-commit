@@ -283,21 +283,24 @@ async function checkEnvironment() {
   const headOid = await getHeadOid(repoRoot);
   const options = await getEffectiveOptions(repoRoot, headOid);
   const runtime = await probeCodexRuntime({ codexPath: options.codexPath, model: options.model, runtime: options.codexRuntime });
-
   let gitVersion = '';
-  try {
-    gitVersion = (await runProcess('git', ['--version'], { timeoutMs: 10000 })).stdout.trim();
-  } catch {
-    throw new Error(ui(
-      '找不到 Git。请确认 git --version 可正常执行。',
-      'Git was not found. Make sure git --version runs successfully.'
-    ));
-  }
+  try { gitVersion = (await runProcess('git', ['--version'], { timeoutMs: 10000 })).stdout.trim(); }
+  catch { throw new Error(ui('找不到 Git。请确认 git --version 可正常执行。', 'Git was not found. Make sure git --version runs successfully.')); }
+  const inspection = options.codexRuntimeInspection || {};
   const endpoint = runtime.provider.endpointHost || 'Codex default';
-  log(`environment ok: codex=${runtime.codexVersion || 'detected'}, provider=${runtime.provider.mode}, endpoint=${endpoint}, liveProbeMs=${runtime.durationMs}`);
+  const remoteName = vscode.env.remoteName || '';
+  const hostLabel = remoteName ? `Remote (${remoteName})` : 'Local';
+  const configLabel = inspection.configPath || 'built-in OpenAI';
+  const credentialLabel = runtime.provider.mode === 'openai' ? 'Codex managed auth' : inspection.credentialEnvPresent ? `env:${inspection.credentialEnv}` : inspection.authJsonPresent ? inspection.authJsonPath : `missing (${inspection.credentialEnv || 'provider credential'})`;
+  log(`Extension Host: ${hostLabel}`);
+  log(`Runtime source: ${inspection.source || 'explicit'}; config=${configLabel}`);
+  log(`Provider: ${runtime.provider.mode}; endpoint=${endpoint}; transport=${inspection.transport || 'managed'}`);
+  log(`Credential source: ${credentialLabel}`);
+  if (inspection.plaintextWarning) log(`WARNING: ${inspection.plaintextWarning}`);
+  log(`environment ok: codex=${runtime.codexVersion || 'detected'}, git=${gitVersion}, liveProbeMs=${runtime.durationMs}`);
   vscode.window.showInformationMessage(ui(
-    `Codex Commit Safe 环境正常：${runtime.codexVersion || options.codexPath}；${gitVersion}；Provider ${runtime.provider.mode} (${endpoint})；真实结构化探测 ${runtime.durationMs} ms`,
-    `Codex Commit Safe environment is ready: ${runtime.codexVersion || options.codexPath}; ${gitVersion}; provider ${runtime.provider.mode} (${endpoint}); live structured probe ${runtime.durationMs} ms`
+    `Codex Commit Safe 环境正常：Extension Host ${hostLabel}；Runtime ${inspection.source || 'explicit'}；Provider ${runtime.provider.mode} (${endpoint})；真实结构化探测 ${runtime.durationMs} ms`,
+    `Codex Commit Safe environment is ready: Extension Host ${hostLabel}; runtime ${inspection.source || 'explicit'}; provider ${runtime.provider.mode} (${endpoint}); live structured probe ${runtime.durationMs} ms`
   ));
 }
 

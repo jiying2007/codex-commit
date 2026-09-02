@@ -41,7 +41,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - Safe Contract v2 使用 ephemeral/read-only/no-approval，并显式关闭 shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency install；
 - 不自动修改源码、Commit 或 Push。
 
-共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.12.4**，SHA 为 `4c746614a1a4a5b6ea166ab6ded32f1319cf44c3`。
+共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.13.0**，SHA 为 `d95f67cc61ce66c16e2aa440829655919e906a75`。
 
 ## Repository Policy
 
@@ -49,7 +49,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/4c746614a1a4a5b6ea166ab6ded32f1319cf44c3/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/d95f67cc61ce66c16e2aa440829655919e906a75/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "zh-CN",
@@ -123,3 +123,7 @@ Codex Commit Safe 会主动忽略 `~/.codex/config.toml`。中转站使用 `safe
 ## 中转站凭据与局域网 HTTP
 
 `openai-compatible` Provider 从 Codex Commit Safe 4.4.1 起统一消费 Core Provider Contract v2。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。
+
+## Runtime Contract v3 — zero-config
+
+Commit 默认使用 **Auto** Runtime。只要当前 VS Code Extension Host 中的 `codex` 已可正常使用，Commit 就直接复用机器级 Family Runtime（`~/.codex-safe/runtime.json`）或机器级 Codex 配置（`${CODEX_HOME}/config.toml` / `~/.codex/config.toml`），无需再次填写中转站地址。Remote SSH 下 Workspace Extension 运行在远端，因此读取的是远端 Linux 用户的配置和 `auth.json`。字面量私网 IP HTTP 可继承，但 Doctor 会明确提示明文风险；公网/非 IP HTTP 继续 fail-closed。VS Code Provider 设置仅作为 machine-scope Advanced Override。
