@@ -122,4 +122,4 @@ Codex Commit Safe intentionally ignores `~/.codex/config.toml`. For a relay, con
 
 ## Relay credentials and private-network HTTP
 
-For `openai-compatible` providers, Codex Commit Safe 4.4.0 consumes Core Provider Contract v2. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
+For `openai-compatible` providers, Codex Commit Safe 4.4.1 consumes Core Provider Contract v2. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
