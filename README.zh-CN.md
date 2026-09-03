@@ -41,7 +41,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - Safe Contract v2 使用 ephemeral/read-only/no-approval，并显式关闭 shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency install；
 - 不自动修改源码、Commit 或 Push。
 
-共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.13.1**，SHA 为 `479e4b33356457a90617aea7bbba5ee25b65b2c8`。
+共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.14.4**，SHA 为 `25467922eeebffa93b7c820f2ffa7590c1625381`。
 
 ## Repository Policy
 
@@ -49,7 +49,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/479e4b33356457a90617aea7bbba5ee25b65b2c8/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/25467922eeebffa93b7c820f2ffa7590c1625381/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "zh-CN",
@@ -122,7 +122,7 @@ Codex Commit Safe 默认使用 **Runtime Contract v3 Auto discovery**。它可�
 
 ## 中转站凭据与局域网 HTTP
 
-`openai-compatible` Provider 在 Codex Commit Safe 4.5.2 中消费 Core Provider Contract v3。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。
+`openai-compatible` Provider 在 Codex Commit Safe 4.5.3 中消费 Core Provider Contract v3。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。
 
 ## Runtime Contract v3 — zero-config
 
