@@ -25,10 +25,14 @@ assert.throws(() => updateChangelog('# Changelog\n\n## Unreleased\n\n## 1.0.0\n'
 
 const root=path.resolve(__dirname,'..');
 const marketplace=fs.readFileSync(path.join(root,'.github','workflows','marketplace.yml'),'utf8');
+assert.match(marketplace,/workflow_run:/);
+assert.match(marketplace,/github\.event\.workflow_run\.head_sha/);
 assert.match(marketplace,/gh release download/);
 assert.match(marketplace,/sha256sum -c SHA256SUMS/);
 assert.match(marketplace,/gh attestation verify .* -R "\$GITHUB_REPOSITORY"/);
-assert.match(marketplace,/vsce publish --packagePath/);
+assert.match(marketplace,/@vscode\/vsce@3\.9\.2 publish --packagePath/);
+assert.match(marketplace,/distribution-receipt\.yml@25467922eeebffa93b7c820f2ffa7590c1625381/);
+assert.match(marketplace,/channel: vscode-marketplace/);
 assert.doesNotMatch(marketplace,/npm run package|vsce package/,'Marketplace must publish exact GitHub Release VSIX without rebuilding');
 const renovate=JSON.parse(fs.readFileSync(path.join(root,'renovate.json'),'utf8'));
 assert.ok(renovate.extends.includes(':automergeDisabled'));
@@ -36,4 +40,4 @@ assert.equal(renovate.minimumReleaseAge,'3 days');
 const verification=fs.readFileSync(path.join(root,'VERIFY_RELEASE.md'),'utf8');
 assert.match(verification,/gh attestation verify codex-commit-safe-<version>\.vsix -R jiying2007\/codex-commit/);
 
-console.log('Release helper, Marketplace artifact reuse, provenance verification and dependency governance tests passed.');
+console.log('Release helper, exact-SHA Marketplace promotion, pinned vsce, Distribution Receipt, provenance verification and dependency governance tests passed.');

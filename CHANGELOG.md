@@ -1,3 +1,8 @@
+## 4.5.3
+
+- Repin to Codex Safe Core 4.14.4 as a new immutable product release; no compatibility shim or stale artifact reuse is permitted.
+- Refresh generated/current-state Family identity and release evidence for the exact Core pin.
+
 ## 4.5.2 - 2026-09-03
 
 - Align current Runtime/Provider documentation with Runtime Contract v3 and Core Provider Contract v3: machine Family Runtime and machine Codex config are valid Auto-discovery sources and are not ignored.
