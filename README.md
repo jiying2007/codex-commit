@@ -118,11 +118,11 @@ MIT
 
 ## Codex provider runtime
 
-Codex Commit Safe intentionally ignores `~/.codex/config.toml`. For a relay, configure `safeCodexCommit.providerMode=openai-compatible`, `providerBaseUrl`, and `providerApiKeyEnv`; the key itself stays in the named environment variable. Compatible endpoints use Responses HTTP/SSE. Environment Check performs a real structured round-trip.
+Codex Commit Safe defaults to **Runtime Contract v3 Auto discovery**. It may reuse machine Family Runtime (`~/.codex-safe/runtime.json`) or machine Codex configuration (`${CODEX_HOME}/config.toml` / `~/.codex/config.toml`) in the Extension Host; VS Code provider settings remain machine-scoped advanced overrides. Environment Check performs a real structured round-trip.
 
 ## Relay credentials and private-network HTTP
 
-For `openai-compatible` providers, Codex Commit Safe 4.4.1 consumes Core Provider Contract v2. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
+For `openai-compatible` providers, Codex Commit Safe 4.5.2 consumes Core Provider Contract v3. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
 
 ## Runtime Contract v3 — zero-config
 

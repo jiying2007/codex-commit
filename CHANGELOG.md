@@ -1,3 +1,8 @@
+## 4.5.2 - 2026-09-03
+
+- Align current Runtime/Provider documentation with Runtime Contract v3 and Core Provider Contract v3: machine Family Runtime and machine Codex config are valid Auto-discovery sources and are not ignored.
+- Preserve Commit 4.5.1 runtime behavior and immutable Core 4.13.1 pin; this patch changes documentation/product identity only.
+
 ## 4.5.1 - 2026-09-03
 
 - Repin to immutable Codex Safe Core 4.13.1 so Commit structured `codex exec --json` generation uses bounded retained stdout plus an independent fail-closed total transcript ceiling.
