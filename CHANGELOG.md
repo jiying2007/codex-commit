@@ -1,3 +1,8 @@
+## 4.5.1 - 2026-09-03
+
+- Repin to immutable Codex Safe Core 4.13.1 so Commit structured `codex exec --json` generation uses bounded retained stdout plus an independent fail-closed total transcript ceiling.
+- Prevent large staged-context/model-event transcripts from being falsely terminated by the historical 4 MiB retained-output limit while preserving Commit authority, Safe Contract v2 and Commit Receipt v4.
+
 ## 4.3.0
 
 - Adopt immutable Safe Core 4.11.0 and consume Review Receipt v5 / Judgment Lifecycle v1 provenance.
