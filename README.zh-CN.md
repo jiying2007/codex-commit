@@ -118,11 +118,11 @@ MIT
 
 ## Codex Provider Runtime
 
-Codex Commit Safe 会主动忽略 `~/.codex/config.toml`。中转站使用 `safeCodexCommit.providerMode=openai-compatible`、`providerBaseUrl` 和 `providerApiKeyEnv`；Key 本身只保存在对应环境变量。兼容端点固定走 Responses HTTP/SSE，环境检查会真实完成一次结构化 round-trip。
+Codex Commit Safe 默认使用 **Runtime Contract v3 Auto discovery**。它可以在 Extension Host 中复用机器级 Family Runtime（`~/.codex-safe/runtime.json`）或机器级 Codex 配置（`${CODEX_HOME}/config.toml` / `~/.codex/config.toml`）；VS Code Provider 设置仅作为 machine-scope Advanced Override。环境检查会真实完成一次结构化 round-trip。
 
 ## 中转站凭据与局域网 HTTP
 
-`openai-compatible` Provider 从 Codex Commit Safe 4.4.1 起统一消费 Core Provider Contract v2。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。
+`openai-compatible` Provider 在 Codex Commit Safe 4.5.2 中消费 Core Provider Contract v3。`providerCredentialSource=auto` 会先读取 `providerApiKeyEnv` 指定的环境变量，不存在时再读取 `${CODEX_HOME}/auth.json` 或 `~/.codex/auth.json`；`auth-json` 只接受 `auth_mode=apikey` 与 `OPENAI_API_KEY`。非 loopback 的 `http://` 地址默认拒绝，只有在用户/应用设置显式开启 `providerAllowInsecureHttp=true` 时才允许。仓库策略不能提供凭据，也不能开启不安全传输。
 
 ## Runtime Contract v3 — zero-config
 
