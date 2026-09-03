@@ -26,6 +26,7 @@ jobs:
           core_sha=479e4b33356457a90617aea7bbba5ee25b65b2c8
           curl -fsSL "https://raw.githubusercontent.com/jiying2007/codex-safe-core/${core_sha}/scripts/repin-consumer.js" -o /tmp/repin-consumer.js
           node /tmp/repin-consumer.js "$PWD" "$core_sha"
+          git checkout HEAD -- .github/workflows/family-release-guard.yml
           node <<'NODE'
           const fs = require('node:fs');
           const version='4.5.1';
