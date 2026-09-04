@@ -3,6 +3,7 @@
 const vscode = require('vscode');
 const { fingerprintPolicy } = require('./codex-safe-core/safe-contract');
 const { resolveCodexRuntime, inspectCodexRuntime } = require('./codex-safe-core/codex-runtime-resolver');
+const { resolveModelRegistry } = require('./codex-safe-core/model-registry-resolver');
 const { POLICY_FILE } = require('./codex-safe-core/policy');
 const { createPolicyValidators } = require('./policy-validation');
 
@@ -73,9 +74,18 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
     if (!codexPath || codexPath.length > 1024 || /[\r\n\0]/.test(codexPath)) {
       throw new Error(ui('User-level safeCodexCommit.codexPath 非法。', 'User-level safeCodexCommit.codexPath is invalid.'));
     }
-    if (model.length > 128 || /[\r\n\0]/.test(model)) {
+    if (model.length > 256 || /[\r\n\0]/.test(model)) {
       throw new Error(ui('User-level safeCodexCommit.model 非法。', 'User-level safeCodexCommit.model is invalid.'));
     }
+    const modelSelectionStrategy=String(getUserOnlySetting(config,'modelSelectionStrategy','auto')||'auto').trim();
+    if(!['auto','preference','fixed'].includes(modelSelectionStrategy)) throw new Error('User-level safeCodexCommit.modelSelectionStrategy is invalid.');
+    if(modelSelectionStrategy==='fixed'&&!model) throw new Error('safeCodexCommit.model is required when modelSelectionStrategy=fixed.');
+    const modelCompatibilityPolicy=String(getUserOnlySetting(config,'modelCompatibilityPolicy',modelSelectionStrategy==='fixed'?'warn':'strict')||'strict').trim();
+    if(!['strict','warn','permissive'].includes(modelCompatibilityPolicy)) throw new Error('User-level safeCodexCommit.modelCompatibilityPolicy is invalid.');
+    const rawCandidates=getUserOnlySetting(config,'modelCandidates',[]);
+    if(!Array.isArray(rawCandidates)||rawCandidates.length>8) throw new Error('User-level safeCodexCommit.modelCandidates is invalid.');
+    const modelCandidates=Object.freeze(rawCandidates.map((raw,index)=>{const text=String(raw||'').trim(),slash=text.indexOf('/');if(slash<=0||slash===text.length-1||text.length>384||/[\r\n\0]/.test(text))throw new Error(`User-level safeCodexCommit.modelCandidates[${index}] is invalid.`);return Object.freeze({provider:text.slice(0,slash),model:text.slice(slash+1)});}));
+    const modelRegistryResolution=resolveModelRegistry();
 
     const language = project.language ?? config.get('language', 'zh-CN');
     if (!['zh-CN', 'en'].includes(language)) throw new Error(ui(`language 不支持：${language}`, `Unsupported language: ${language}`));
@@ -102,6 +112,12 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
     const options = {
       codexPath,
       model,
+      modelSelectionStrategy,
+      modelCompatibilityPolicy,
+      modelCandidates,
+      modelRegistry:modelRegistryResolution.registry,
+      modelRegistrySource:modelRegistryResolution.source,
+      modelRegistryPath:modelRegistryResolution.configPath,
       codexRuntime,
       codexRuntimeInspection,
       language,
@@ -129,6 +145,7 @@ function createCommitPolicy({ ui, readProjectRulesAtHead }) {
       styleHistoryLimit: options.styleHistoryLimit,
       extraInstructions: options.extraInstructions,
       codexRuntime: options.codexRuntime,
+      modelRouting:`fast/reviewer/${options.modelSelectionStrategy}/${options.modelCompatibilityPolicy}/${options.modelRegistry?.revision||'unmanaged'}`,
       projectPolicyFingerprint: options.projectPolicyFingerprint
     });
     return Object.freeze(options);

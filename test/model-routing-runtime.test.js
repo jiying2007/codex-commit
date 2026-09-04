@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('assert');
+const fs=require('fs');
+const pkg=require('../package.json');
+const props=pkg.contributes.configuration.properties;
+const runtime=fs.readFileSync('src/commit-runtime.js','utf8');
+const policy=fs.readFileSync('src/policy.js','utf8');
+assert.strictEqual(props['safeCodexCommit.modelSelectionStrategy'].default,'auto');
+assert.strictEqual(props['safeCodexCommit.modelCompatibilityPolicy'].default,'strict');
+assert.match(runtime,/resolveModelSelection/);
+assert.match(runtime,/buildModelEvidence/);
+assert.match(runtime,/role:'reviewer',mode:'fast'/);
+assert.match(policy,/resolveModelRegistry/);
+assert.doesNotMatch(runtime,/crossProvider:true/);
+console.log('Commit Model Routing v1 runtime contract verified.');

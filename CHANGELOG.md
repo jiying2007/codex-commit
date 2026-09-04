@@ -1,3 +1,9 @@
+## 4.6.0 - 2026-09-04
+
+- Consume Core Model Routing Contract v1 for Commit generation with fixed Reviewer role and fast execution intent.
+- Add approved machine Registry Auto routing plus explicit Preference/Fixed strategies and per-call Model Evidence; no Registry remains explicitly unmanaged rather than synthesized as approved.
+- Bind routing strategy/registry revision into policy identity while preserving deterministic scope/style/result validation.
+
 ## 4.5.5 - 2026-09-04
 
 - Repair the VS Code Marketplace distribution-receipt reusable-workflow pin to immutable Codex Safe Core 4.15.0 while preserving the exact 4.15.0 runtime gitlink and Product Contract.
