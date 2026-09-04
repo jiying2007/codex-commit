@@ -41,7 +41,7 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - Safe Contract v2 runs Codex ephemeral/read-only/no-approval with shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency installation disabled;
 - no source edit, commit or push side effect.
 
-Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.14.4** submodule at `25467922eeebffa93b7c820f2ffa7590c1625381`.
+Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.15.0** submodule at `e962826ee6556fd8ffa74ab1994bf43d62826f10`.
 
 ## Repository policy
 
@@ -49,7 +49,7 @@ The only repository policy is committed `.codex-safe.json` with `schemaVersion: 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/25467922eeebffa93b7c820f2ffa7590c1625381/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/e962826ee6556fd8ffa74ab1994bf43d62826f10/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "en",
@@ -122,7 +122,7 @@ Codex Commit Safe defaults to **Runtime Contract v3 Auto discovery**. It may reu
 
 ## Relay credentials and private-network HTTP
 
-For `openai-compatible` providers, Codex Commit Safe 4.5.3 consumes Core Provider Contract v3. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
+For `openai-compatible` providers, Codex Commit Safe 4.5.4 consumes Core Provider Contract v3. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
 
 ## Runtime Contract v3 — zero-config
 
