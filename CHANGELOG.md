@@ -1,3 +1,8 @@
+## 4.5.5 - 2026-09-04
+
+- Repair the VS Code Marketplace distribution-receipt reusable-workflow pin to immutable Codex Safe Core 4.15.0 while preserving the exact 4.15.0 runtime gitlink and Product Contract.
+- Publish a new exact-SHA patch release because the immutable 4.5.4 GitHub Release cannot be mutated and Family readiness requires Marketplace distribution evidence bound to the same main/release SHA.
+
 ## 4.5.4
 
 - Repin to Codex Safe Core 4.15.0 as a new immutable product release; no compatibility shim or stale artifact reuse is permitted.
