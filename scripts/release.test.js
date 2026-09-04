@@ -3,6 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const contract = require('../product-contract.json');
 const { compareVersions, parseGitHubRemote, parseVersion, platformCommand, sameFiles, updateChangelog } = require('./release');
 
 assert.deepStrictEqual(parseVersion('1.2.3'), [1, 2, 3]);
@@ -31,7 +32,7 @@ assert.match(marketplace,/gh release download/);
 assert.match(marketplace,/sha256sum -c SHA256SUMS/);
 assert.match(marketplace,/gh attestation verify .* -R "\$GITHUB_REPOSITORY"/);
 assert.match(marketplace,/@vscode\/vsce@3\.9\.2 publish --packagePath/);
-assert.match(marketplace,/distribution-receipt\.yml@25467922eeebffa93b7c820f2ffa7590c1625381/);
+assert.match(marketplace,new RegExp(`distribution-receipt\\.yml@${contract.safeCoreCommit}`));
 assert.match(marketplace,/channel: vscode-marketplace/);
 assert.doesNotMatch(marketplace,/npm run package|vsce package/,'Marketplace must publish exact GitHub Release VSIX without rebuilding');
 const renovate=JSON.parse(fs.readFileSync(path.join(root,'renovate.json'),'utf8'));
