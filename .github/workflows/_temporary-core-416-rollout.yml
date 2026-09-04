@@ -1,0 +1,36 @@
+name: Temporary Core 4.16 Rollout
+
+on:
+  push:
+    branches: [family-core-4.16-rollout]
+
+permissions:
+  contents: write
+
+jobs:
+  rollout:
+    if: ${{ !contains(github.event.head_commit.message, '[core-416-generated]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: family-core-4.16-rollout, fetch-depth: 0, persist-credentials: true }
+      - uses: actions/setup-node@e51e5fe84fc33b4c73ebe40526b2694712b5b858
+        with: { node-version: '22.22.2', check-latest: false }
+      - name: Canonical release-bearing repin
+        env: { CORE_SHA: 786e3a3fc896e0e623af6fe63dbf814ddd09bad8 }
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive
+          git -C src/codex-safe-core fetch --depth=1 origin "$CORE_SHA"
+          git -C src/codex-safe-core checkout --detach "$CORE_SHA"
+          node src/codex-safe-core/scripts/repin-consumer.js . "$CORE_SHA"
+          git checkout -- .github/workflows/family-release-guard.yml
+          git config user.name 'codex-safe-family-bot'
+          git config user.email 'codex-safe-family-bot@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && { echo 'canonical repin produced no changes' >&2; exit 2; }
+          version="$(node -p "require('./package.json').version")"
+          git commit -m "[core-416-generated] chore(release): Commit ${version} pins Core 4.16.0"
+          git push origin HEAD:family-core-4.16-rollout
