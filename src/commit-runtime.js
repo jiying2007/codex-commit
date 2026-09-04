@@ -39,7 +39,9 @@ function loadSafeCore() {
     typeof safeCoreModule?.splitUnifiedDiff !== 'function' ||
     typeof safeCoreModule?.scoreEvidenceRisk !== 'function' ||
     typeof safeCoreModule?.adaptiveBudget !== 'function' ||
-    typeof safeCoreModule?.selectModel !== 'function'
+    typeof safeCoreModule?.selectModel !== 'function' ||
+    typeof safeCoreModule?.resolveModelSelection !== 'function' ||
+    typeof safeCoreModule?.buildModelEvidence !== 'function'
   ) {
     throw new TypeError('Safe Core does not expose the expected Codex/context/efficiency interface.');
   }
@@ -253,7 +255,15 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     const riskScore = safeCore.scoreEvidenceRisk({ paths, text: diff });
     const contextBudgetBytes = safeCore.adaptiveBudget(options.maxDiffBytes, riskScore, { lowFactor: 0.35, mediumFactor: 0.65, min: 16 * 1024 });
     const semanticContext = safeCore.buildSemanticContext({ diff, maxBytes: contextBudgetBytes });
-    const model = safeCore.selectModel({ model: options.model, fastModel: options.fastModel, riskScore });
+    let model=String(options.model||'').trim(),modelSelection=null;
+    if(options.modelRegistry){
+      const strategy=String(options.modelSelectionStrategy||'auto'),provider=String(options.codexRuntimeInspection?.providerId||options.codexRuntime?.provider?.mode||'').trim();
+      const request={registry:options.modelRegistry,role:'reviewer',mode:'fast',strategy,provider,compatibilityPolicy:options.modelCompatibilityPolicy||(strategy==='fixed'?'warn':'strict'),crossProvider:false};
+      if(strategy==='fixed'){request.model=model;request.fixed={provider,model};}
+      else if(strategy==='preference')request.candidates=options.modelCandidates||[];
+      modelSelection=safeCore.resolveModelSelection(request);
+      model=modelSelection.resolvedModel;
+    }
     const input = [
       prompt,
       '',
@@ -286,7 +296,11 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
           inputDiffBytes: semanticContext.inputDiffBytes,
           requestEstimate: result.requestEstimate,
           usage: result.usage,
-          durationMs: result.durationMs
+          durationMs: result.durationMs,
+          modelRoutingContractVersion: 1,
+          modelRoutingManaged: Boolean(modelSelection),
+          modelRegistryRevision: modelSelection?.registryRevision || '',
+          modelEvidence: modelSelection ? safeCore.buildModelEvidence(modelSelection,{usage:result.usage,routingPolicyRevision:'commit-4.6.0-v1',lineagePinned:false}) : null
         }),
         enumerable: false, configurable: false, writable: false
       });
