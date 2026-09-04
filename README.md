@@ -122,7 +122,7 @@ Codex Commit Safe defaults to **Runtime Contract v3 Auto discovery**. It may reu
 
 ## Relay credentials and private-network HTTP
 
-For `openai-compatible` providers, Codex Commit Safe 4.5.4 consumes Core Provider Contract v3. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
+For `openai-compatible` providers, Codex Commit Safe 4.5.5 consumes Core Provider Contract v3. `providerCredentialSource=auto` first uses `providerApiKeyEnv`, then falls back to `${CODEX_HOME}/auth.json` or `~/.codex/auth.json`; `auth-json` requires `auth_mode=apikey` and `OPENAI_API_KEY`. Non-loopback `http://` endpoints are rejected unless `providerAllowInsecureHttp=true` is explicitly set in user/application settings. Repository policy cannot provide credentials or enable insecure transport.
 
 ## Runtime Contract v3 — zero-config
 
