@@ -1,13 +1,10 @@
 name: VS Code Marketplace
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Immutable GitHub Release tag to publish, for example v4.6.1'
+        description: 'Immutable GitHub Release tag to publish, for example v4.6.2'
         required: true
 
 permissions:
