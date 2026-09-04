@@ -1,0 +1,56 @@
+name: Temporary Commit 4.6 Model Routing Finalizer
+
+on:
+  push:
+    branches: ["feat/model-routing-v1-runtime"]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/model-routing-v1-runtime
+          fetch-depth: 0
+      - name: Apply deterministic Commit 4.6 routing migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          def rep(path,old,new):
+              p=Path(path); t=p.read_text()
+              if old not in t: raise SystemExit(f'missing anchor in {path}: {old[:100]!r}')
+              p.write_text(t.replace(old,new,1))
+
+          rep('src/policy.js',"const { resolveCodexRuntime, inspectCodexRuntime } = require('./codex-safe-core/codex-runtime-resolver');\n","const { resolveCodexRuntime, inspectCodexRuntime } = require('./codex-safe-core/codex-runtime-resolver');\nconst { resolveModelRegistry } = require('./codex-safe-core/model-registry-resolver');\n")
+          rep('src/policy.js',"    if (model.length > 128 || /[\\r\\n\\0]/.test(model)) {\n      throw new Error(ui('User-level safeCodexCommit.model 非法。', 'User-level safeCodexCommit.model is invalid.'));\n    }\n","    if (model.length > 256 || /[\\r\\n\\0]/.test(model)) {\n      throw new Error(ui('User-level safeCodexCommit.model 非法。', 'User-level safeCodexCommit.model is invalid.'));\n    }\n    const modelSelectionStrategy=String(getUserOnlySetting(config,'modelSelectionStrategy','auto')||'auto').trim();\n    if(!['auto','preference','fixed'].includes(modelSelectionStrategy)) throw new Error('User-level safeCodexCommit.modelSelectionStrategy is invalid.');\n    if(modelSelectionStrategy==='fixed'&&!model) throw new Error('safeCodexCommit.model is required when modelSelectionStrategy=fixed.');\n    const modelCompatibilityPolicy=String(getUserOnlySetting(config,'modelCompatibilityPolicy',modelSelectionStrategy==='fixed'?'warn':'strict')||'strict').trim();\n    if(!['strict','warn','permissive'].includes(modelCompatibilityPolicy)) throw new Error('User-level safeCodexCommit.modelCompatibilityPolicy is invalid.');\n    const rawCandidates=getUserOnlySetting(config,'modelCandidates',[]);\n    if(!Array.isArray(rawCandidates)||rawCandidates.length>8) throw new Error('User-level safeCodexCommit.modelCandidates is invalid.');\n    const modelCandidates=Object.freeze(rawCandidates.map((raw,index)=>{const text=String(raw||'').trim(),slash=text.indexOf('/');if(slash<=0||slash===text.length-1||text.length>384||/[\\r\\n\\0]/.test(text))throw new Error(`User-level safeCodexCommit.modelCandidates[${index}] is invalid.`);return Object.freeze({provider:text.slice(0,slash),model:text.slice(slash+1)});}));\n    const modelRegistryResolution=resolveModelRegistry();\n")
+          rep('src/policy.js',"      model,\n      codexRuntime,\n","      model,\n      modelSelectionStrategy,\n      modelCompatibilityPolicy,\n      modelCandidates,\n      modelRegistry:modelRegistryResolution.registry,\n      modelRegistrySource:modelRegistryResolution.source,\n      modelRegistryPath:modelRegistryResolution.configPath,\n      codexRuntime,\n")
+          rep('src/policy.js',"      codexRuntime: options.codexRuntime,\n      projectPolicyFingerprint: options.projectPolicyFingerprint\n","      codexRuntime: options.codexRuntime,\n      modelRouting:`fast/reviewer/${options.modelSelectionStrategy}/${options.modelCompatibilityPolicy}/${options.modelRegistry?.revision||'unmanaged'}`,\n      projectPolicyFingerprint: options.projectPolicyFingerprint\n")
+
+          rep('src/commit-runtime.js',"    typeof safeCoreModule?.selectModel !== 'function'\n","    typeof safeCoreModule?.selectModel !== 'function' ||\n    typeof safeCoreModule?.resolveModelSelection !== 'function' ||\n    typeof safeCoreModule?.buildModelEvidence !== 'function'\n")
+          rep('src/commit-runtime.js',"    const model = safeCore.selectModel({ model: options.model, fastModel: options.fastModel, riskScore });\n","    let model=String(options.model||'').trim(),modelSelection=null;\n    if(options.modelRegistry){\n      const strategy=String(options.modelSelectionStrategy||'auto'),provider=String(options.codexRuntimeInspection?.providerId||options.codexRuntime?.provider?.mode||'').trim();\n      const request={registry:options.modelRegistry,role:'reviewer',mode:'fast',strategy,provider,compatibilityPolicy:options.modelCompatibilityPolicy||(strategy==='fixed'?'warn':'strict'),crossProvider:false};\n      if(strategy==='fixed'){request.model=model;request.fixed={provider,model};}\n      else if(strategy==='preference')request.candidates=options.modelCandidates||[];\n      modelSelection=safeCore.resolveModelSelection(request);\n      model=modelSelection.resolvedModel;\n    }\n")
+          rep('src/commit-runtime.js',"          durationMs: result.durationMs\n","          durationMs: result.durationMs,\n          modelRoutingContractVersion: 1,\n          modelRoutingManaged: Boolean(modelSelection),\n          modelRegistryRevision: modelSelection?.registryRevision || '',\n          modelEvidence: modelSelection ? safeCore.buildModelEvidence(modelSelection,{usage:result.usage,routingPolicyRevision:'commit-4.6.0-v1',lineagePinned:false}) : null\n")
+
+          pkg=Path('package.json'); d=json.loads(pkg.read_text()); d['version']='4.6.0'; props=d['contributes']['configuration']['properties']
+          props['safeCodexCommit.modelSelectionStrategy']={'type':'string','enum':['auto','preference','fixed'],'default':'auto','scope':'application','description':'Model Routing Contract v1 strategy. Commit always uses the Reviewer role with fast execution intent.'}
+          props['safeCodexCommit.modelCandidates']={'type':'array','items':{'type':'string','minLength':3,'maxLength':384},'maxItems':8,'default':[],'scope':'application','description':'Ordered provider/model candidates used only by preference routing.'}
+          props['safeCodexCommit.modelCompatibilityPolicy']={'type':'string','enum':['strict','warn','permissive'],'default':'strict','scope':'application','description':'Compatibility policy for Commit model routing. Auto/preference should normally remain strict.'}
+          d['scripts']['test:unit']=d['scripts']['test:unit']+' && node test/model-routing-runtime.test.js'
+          pkg.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n')
+          lock=Path('package-lock.json'); ld=json.loads(lock.read_text()); ld['version']='4.6.0'; ld['packages']['']['version']='4.6.0'; lock.write_text(json.dumps(ld,ensure_ascii=False,indent=2)+'\n')
+          pc=Path('product-contract.json'); pd=json.loads(pc.read_text()); pd['productVersion']='4.6.0'; pc.write_text(json.dumps(pd,ensure_ascii=False,indent=2)+'\n')
+          ch=Path('CHANGELOG.md'); ct=ch.read_text(); heading='## 4.6.0 - 2026-09-04\n\n- Consume Core Model Routing Contract v1 for Commit generation with fixed Reviewer role and fast execution intent.\n- Add approved machine Registry Auto routing plus explicit Preference/Fixed strategies and per-call Model Evidence; no Registry remains explicitly unmanaged rather than synthesized as approved.\n- Bind routing strategy/registry revision into policy identity while preserving deterministic scope/style/result validation.\n\n';
+          if '## 4.6.0 - 2026-09-04' not in ct: ch.write_text(ct.replace('## 4.5.5',heading+'## 4.5.5',1))
+          Path('test/model-routing-runtime.test.js').write_text("'use strict';\nconst assert=require('assert');\nconst fs=require('fs');\nconst pkg=require('../package.json');\nconst props=pkg.contributes.configuration.properties;\nconst runtime=fs.readFileSync('src/commit-runtime.js','utf8');\nconst policy=fs.readFileSync('src/policy.js','utf8');\nassert.strictEqual(props['safeCodexCommit.modelSelectionStrategy'].default,'auto');\nassert.strictEqual(props['safeCodexCommit.modelCompatibilityPolicy'].default,'strict');\nassert.match(runtime,/resolveModelSelection/);\nassert.match(runtime,/buildModelEvidence/);\nassert.match(runtime,/role:'reviewer',mode:'fast'/);\nassert.match(policy,/resolveModelRegistry/);\nassert.doesNotMatch(runtime,/crossProvider:true/);\nconsole.log('Commit Model Routing v1 runtime contract verified.');\n")
+          PY
+          git config user.name codex-safe-family-bot
+          git config user.email codex-safe-family-bot@users.noreply.github.com
+          git add -A -- ':!.github/workflows/**'
+          if ! git diff --cached --quiet; then git commit -m 'feat(commit): consume Model Routing Contract v1'; git push origin HEAD:feat/model-routing-v1-runtime; fi
