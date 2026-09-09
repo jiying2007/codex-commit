@@ -1,3 +1,8 @@
+## 4.6.5
+
+- Repin to Codex Safe Core 4.18.0 because the shipped Core runtime digest changed to `0b9c507ddb74bf40a0b950c3d8548ae747f547f76d3d2d37cebbd761cf28f5a0`; publish a new immutable product release and distribution receipt.
+- Refresh Product Contract v2 and generated/current-state Family identity for the exact Core pin.
+
 ## 4.6.4
 
 - Consolidate all merge-blocking pull-request validation behind the canonical `CI Gate` without reducing Commit product, Extension Host, security, dependency or Family governance coverage; publish this exact workflow-consolidated main snapshot as a new immutable product release.
