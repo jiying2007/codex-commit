@@ -345,7 +345,7 @@
   },
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
-    "@vscode/vsce": "3.9.2",
+    "@vscode/vsce": "4.0.0",
     "esbuild": "0.28.2"
   },
   "repository": {
