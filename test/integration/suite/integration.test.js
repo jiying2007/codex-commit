@@ -74,6 +74,17 @@ async function run() {
   assert.strictEqual(r2.inputBox.value, 'fix(wifi): fix integration test issue');
   await setSetting('language', 'zh-CN');
 
+  // Editing the real SCM draft while Codex runs must preserve the user's text.
+  await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(repo1, 'wifi.c')));
+  r1.inputBox.value = 'initial draft';
+  fs.writeFileSync(delayFile, '800');
+  const draftInvocation = invocationCount(startedFile);
+  const draftPending = vscode.commands.executeCommand('safeCodexCommit.generate');
+  await waitForInvocation(startedFile, draftInvocation);
+  r1.inputBox.value = 'my manually edited commit message';
+  await draftPending;
+  assert.strictEqual(r1.inputBox.value, 'my manually edited commit message');
+
   // Index changed during generation => discard.
   await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(repo1, 'wifi.c')));
   r1.inputBox.value = '';

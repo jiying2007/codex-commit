@@ -35,6 +35,7 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - Safe Core Semantic Context Budget handles source/generated/binary files predictably;
 - Structured Output is schema/semantics validated before entering the SCM input;
 - HEAD/index changes invalidate stale results;
+- a newer generation supersedes an older one; edits made to the SCM draft during generation are preserved, with a separate generated-message preview;
 - matching Review Receipt v5 can be incorporated into Commit provenance;
 - pending Commit Receipt v4 binds HEAD, index, full diff, final message, policy and review evidence;
 - later Change evidence is accepted only after recomputing the real first-parent commit fingerprints;
@@ -42,6 +43,8 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - no source edit, commit or push side effect.
 
 Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.18.1** submodule at `190651770a444b0693d82228afc66879dd57b0c0`.
+
+Behavioral test scope and packaging dependency constraints are documented in [Validation](docs/VALIDATION.md).
 
 ## Repository policy
 
