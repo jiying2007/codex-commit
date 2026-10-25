@@ -1,7 +1,5 @@
 # Changelog
 
-## Unreleased
-
 ## 4.6.6
 
 - Recheck generation identity and the exact HEAD/index snapshot after Review evidence lookup, then compare-and-set the SCM draft synchronously before publication.
