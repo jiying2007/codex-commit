@@ -17,8 +17,8 @@ const runtime = createCommitRuntime({
     if (args.includes('exec') && args.includes('--json') && args.includes('--output-schema')) {
       return {
         stdout: [
-          JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 120, cached_input_tokens: 40, output_tokens: 12 } }),
-          JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } })
+          JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } }),
+          JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 120, cached_input_tokens: 40, output_tokens: 12 } })
         ].join('\n') + '\n',
         stderr: ''
       };
@@ -70,7 +70,10 @@ const runtime = createCommitRuntime({
   assert.strictEqual(schema.additionalProperties, false);
   assert.deepStrictEqual(schema.properties.scope.enum, ['', 'core', 'wifi']);
 
-  const parsed = runtime.parseCodexJsonl(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } }));
+  const parsed = runtime.parseCodexJsonl([
+    JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } }),
+    JSON.stringify({ type: 'turn.completed' })
+  ].join('\n'));
   assert.strictEqual(parsed, JSON.stringify(structured));
   assert.throws(() => runtime.parseCodexJsonl('{bad json'), /invalid JSONL/i);
 

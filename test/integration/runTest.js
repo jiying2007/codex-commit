@@ -69,10 +69,13 @@ process.stdin.on('end',()=>{
   let delay=0;try{delay=Number(fs.readFileSync(${JSON.stringify(delayFile)},'utf8'))||0;}catch{}
   const english=input.includes('Use English for description and body.');
   const description=english?'fix integration test issue':'修复集成测试问题';
-  setTimeout(()=>console.log(JSON.stringify({
-    type:'item.completed',
-    item:{type:'agent_message',text:JSON.stringify({type:'fix',scope:'wifi',description,body:[]})}
-  })),delay);
+  setTimeout(()=>{
+    console.log(JSON.stringify({
+      type:'item.completed',
+      item:{type:'agent_message',text:JSON.stringify({type:'fix',scope:'wifi',description,body:[]})}
+    }));
+    console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:1,cached_input_tokens:0,output_tokens:1}}));
+  },delay);
 });
 `);
   if (process.platform === 'win32') {

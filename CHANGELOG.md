@@ -1,3 +1,13 @@
+# Changelog
+
+## 4.6.6
+
+- Recheck generation identity and the exact HEAD/index snapshot after Review evidence lookup, then compare-and-set the SCM draft synchronously before publication.
+- Capture generation identity and the initial draft before asynchronous HEAD/policy preparation, so delayed preparation cannot supersede a newer request or overlook a manual edit.
+- Preserve manual draft edits made during generation and offer the generated message in a separate preview. Retract only untouched generated text when the repository changes during publication; suppress stale receipts and completion notices.
+- Add controller race/cancellation regressions and a real Extension Host draft-edit scenario; preserve Commit Receipt v4 and the formally published Core pin.
+- Refresh compatible packaging dependencies and constrain Azure Identity to its unaffected compatible 4.13.0 dependency branch, with a tested UUID 11.1.1 override for MSAL's unchanged CommonJS v4 call.
+
 ## 4.6.5
 
 - Repin to Codex Safe Core 4.18.0 because the shipped Core runtime digest changed to `0b9c507ddb74bf40a0b950c3d8548ae747f547f76d3d2d37cebbd761cf28f5a0`; publish a new immutable product release and distribution receipt.
@@ -58,8 +68,6 @@
 - Keep Commit message generation fresh-only; no Judgment replay or model-result persistence is introduced.
 - Treat only current-session Review provenance as current when attaching Review evidence to Commit receipts.
 
-# Changelog
-
 ## 4.4.1 - 2026-09-02
 
 - Release-only patch carrying the exact Codex Safe Core 4.12.4 family pin and validated commit/runtime contracts; no Commit Safe runtime semantics change.
@@ -84,8 +92,6 @@
 ## 4.2.0 - 2026-08-28
 
 - Consume Core v4.6 Codex Runtime/Provider Contract, add explicit OpenAI-compatible relay configuration, live Environment Check, split runtime timeouts and provider-aware diagnostics while keeping Safe Contract isolation.
-
-## Unreleased
 
 ## 4.2.2 - 2026-08-30
 

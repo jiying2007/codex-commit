@@ -35,6 +35,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - Safe Core Semantic Context Budget 对 source/generated/binary 文件做确定性预算；
 - Structured Output 通过本地 schema/语义校验后才写 SCM 输入框；
 - HEAD/index 变化会使 stale result 失效；
+- 新生成请求会取代旧请求；生成期间手工编辑的 SCM 草稿会保留，生成结果可通过通知中的“查看生成结果”单独预览；
 - 匹配的 Review Receipt v5 可进入 Commit provenance；
 - pending Commit Receipt v4 绑定 HEAD、index、完整 diff、最终 message、policy 和 Review evidence；
 - Change 阶段只有重新计算真实 first-parent commit fingerprint 完全匹配时才承认 provenance；
@@ -42,6 +43,8 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - 不自动修改源码、Commit 或 Push。
 
 共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.18.1**，SHA 为 `190651770a444b0693d82228afc66879dd57b0c0`。
+
+行为验证范围及打包依赖约束见 [Validation](docs/VALIDATION.md)。
 
 ## Repository Policy
 
