@@ -54,7 +54,7 @@ function createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext
     return selected?.item ? { ...selected.item, repositoryCount: repositories.length } : undefined;
   }
 
-  async function setCommitInput(repositoryInfo, message) {
+  function setCommitInput(repositoryInfo, message) {
     if (repositoryInfo.repo?.inputBox) {
       repositoryInfo.repo.inputBox.value = message;
       return;
@@ -69,6 +69,12 @@ function createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext
     ));
   }
 
+  function compareAndSetCommitInput(repositoryInfo, expectedValue, message) {
+    if (getCurrentCommitInput(repositoryInfo) !== expectedValue) return false;
+    setCommitInput(repositoryInfo, message);
+    return true;
+  }
+
   function getCurrentCommitInput(repositoryInfo) {
     if (repositoryInfo.repo?.inputBox) return repositoryInfo.repo.inputBox.value || '';
     if (repositoryInfo.repositoryCount === 1) return vscode.scm.inputBox.value || '';
@@ -78,7 +84,7 @@ function createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext
     ));
   }
 
-  return Object.freeze({ getGitApi, getRepositories, chooseRepository, setCommitInput, getCurrentCommitInput });
+  return Object.freeze({ getGitApi, getRepositories, chooseRepository, setCommitInput, compareAndSetCommitInput, getCurrentCommitInput });
 }
 
 module.exports = Object.freeze({ createRepositoryUi });
