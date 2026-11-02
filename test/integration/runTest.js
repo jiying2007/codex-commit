@@ -25,7 +25,7 @@ function fakeCodex(base, delayFile, startedFile) {
   fs.writeFileSync(js, `
 const fs=require('fs');
 const args=process.argv.slice(2);
-if(args.length===1&&args[0]==='--version'){console.log('codex-cli 1.2.3');process.exit(0);}
+if(args.length===1&&args[0]==='--version'){console.log('codex-cli fake');process.exit(0);}
 if(args.length===1&&args[0]==='--help'){console.log('--ask-for-approval');process.exit(0);}
 if(args.length===2&&args[0]==='exec'&&args[1]==='--help'){
   console.log('--json --ephemeral --skip-git-repo-check --ignore-user-config --ignore-rules --sandbox --output-schema --config --model');
@@ -74,7 +74,7 @@ process.stdin.on('end',()=>{
       type:'item.completed',
       item:{type:'agent_message',text:JSON.stringify({type:'fix',scope:'wifi',description,body:[]})}
     }));
-    console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:120,cached_input_tokens:40,output_tokens:12}}));
+    console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:1,cached_input_tokens:0,output_tokens:1}}));
   },delay);
 });
 `);

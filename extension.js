@@ -36,7 +36,7 @@ const {
 } = createGitRepository({ runProcess, runProcessBuffer, ui });
 const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
 const { getEffectiveOptions } = createCommitPolicy({ ui, readProjectRulesAtHead });
-const { getRepositories, chooseRepository, setCommitInput, getCurrentCommitInput } = createRepositoryUi({
+const { getRepositories, chooseRepository, compareAndSetCommitInput, getCurrentCommitInput } = createRepositoryUi({
   git,
   normalizeFsPath,
   repositoryFromCommandContext,
@@ -83,7 +83,8 @@ function beginGeneration(repoRoot) {
 }
 
 function isCurrentGeneration(key, id) {
-  return activeGenerations.get(key)?.id === id;
+  const current = activeGenerations.get(key);
+  return current?.id === id && !current.cancelSource.token.isCancellationRequested;
 }
 
 function finishGeneration(key, id) {
@@ -102,18 +103,33 @@ function linkCancellation(externalToken, internalSource) {
   return externalToken.onCancellationRequested(() => internalSource.cancel());
 }
 
+function offerGeneratedMessage(message) {
+  const action = ui('查看生成结果', 'View Generated Message');
+  void Promise.resolve(vscode.window.showInformationMessage(ui(
+    '生成期间 Commit 输入框已被编辑，已保留你的草稿。生成结果可单独查看。',
+    'The commit input changed during generation. Your draft was preserved; you can view the generated message separately.'
+  ), action)).then(async selected => {
+    if (selected !== action) return;
+    const document = await vscode.workspace.openTextDocument({ language: 'git-commit', content: message });
+    await vscode.window.showTextDocument(document, { preview: true });
+  }).catch(error => log(`generated message preview failed: code=${error?.code || 'unknown'}`));
+}
+
 async function generate({ regenerate = false, commandArgs = [] } = {}) {
   assertTrustedWorkspace();
   const repositoryInfo = await chooseRepository(commandArgs);
   if (!repositoryInfo) return;
 
   const repoRoot = repositoryInfo.root;
-  const policyHeadOid = await getHeadOid(repoRoot);
-  const options = await getEffectiveOptions(repoRoot, policyHeadOid);
+  const initialCommitInput = getCurrentCommitInput(repositoryInfo);
   const { key, state } = beginGeneration(repoRoot);
   log(`${regenerate ? 'regenerate' : 'generate'} started`);
 
   try {
+    const policyHeadOid = await getHeadOid(repoRoot, state.cancelSource.token);
+    if (!isCurrentGeneration(key, state.id)) return;
+    const options = await getEffectiveOptions(repoRoot, policyHeadOid);
+    if (!isCurrentGeneration(key, state.id)) return;
     const generationResult = await vscode.window.withProgress({
       location: vscode.ProgressLocation.SourceControl,
       title: regenerate
@@ -192,7 +208,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
           : emptyScopeDecision();
         if (options.autoInferScope) log(`${summarizeScopeDecision(scopeDecision)}, impactSignals=${impactScope.signalCount}`);
         const preferredScope = scopeDecision.scope;
-        const previousMessage = regenerate ? getCurrentCommitInput(repositoryInfo).trim().slice(0, 800) : '';
+        const previousMessage = regenerate ? initialCommitInput.trim().slice(0, 800) : '';
         const repositoryStyleGuidance = await getRepositoryStyleGuidance(
           repoRoot,
           snapshotAfter.headOid,
@@ -235,10 +251,38 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
 
     const message = formatCommitMessage(generationResult.structured, options);
     const reviewEvidence = await getReviewEvidence(repoRoot, currentRepositorySnapshot);
-    await setCommitInput(repositoryInfo, message);
+    if (!isCurrentGeneration(key, state.id)) return;
+    const publishSnapshot = await getRepositorySnapshot(repoRoot, state.cancelSource.token);
+    if (!isCurrentGeneration(key, state.id)) return;
+    if (!repositorySnapshotsEqual(publishSnapshot, generationResult.repositorySnapshot)) {
+      log('generation discarded before publishing: Git HEAD or staged index changed');
+      vscode.window.showWarningMessage(ui(
+        '写入 Commit Message 前 Git HEAD 或 staged changes 已变化，请重新生成。',
+        'Git HEAD or staged changes changed before publishing the Commit Message. Generate it again.'
+      ));
+      return;
+    }
+    // No asynchronous work may separate this final generation/draft check and the SCM write.
+    if (!compareAndSetCommitInput(repositoryInfo, initialCommitInput, message)) {
+      log('generation retained as preview: commit draft changed');
+      offerGeneratedMessage(message);
+      return;
+    }
 
     const receiptSnapshot = await getRepositorySnapshot(repoRoot);
-    if (repositorySnapshotsEqual(receiptSnapshot, currentRepositorySnapshot) && commitReceiptStore) {
+    if (!isCurrentGeneration(key, state.id)) return;
+    if (!repositorySnapshotsEqual(receiptSnapshot, publishSnapshot)) {
+      // Retract only our unchanged value, preserving any newer draft or generation.
+      compareAndSetCommitInput(repositoryInfo, message, initialCommitInput);
+      log('commit input retracted: repository changed while publishing');
+      vscode.window.showWarningMessage(ui(
+        'Git HEAD 或 staged changes 在写入过程中变化，已撤回仍未被编辑的生成结果，请重新生成。',
+        'Git HEAD or staged changes changed while publishing. The untouched generated message was retracted; generate it again.'
+      ));
+      return;
+    }
+    if (getCurrentCommitInput(repositoryInfo) !== message) return;
+    if (commitReceiptStore) {
       const receipt = validateCommitReceipt({
         schemaVersion: COMMIT_RECEIPT_SCHEMA_VERSION,
         kind: 'codex-commit-safe',
@@ -259,9 +303,9 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
       });
       if (!receipt) throw new Error('Generated Commit Receipt v4 failed validation.');
       await commitReceiptStore.persistPending(repoRoot, receipt);
-    } else {
-      log('commit receipt not persisted: repository changed after generation');
     }
+
+    if (!isCurrentGeneration(key, state.id) || getCurrentCommitInput(repositoryInfo) !== message) return;
 
     const firstLine = message.split(/\r?\n/, 1)[0];
     const reviewLabel = reviewEvidence.status === 'current'
