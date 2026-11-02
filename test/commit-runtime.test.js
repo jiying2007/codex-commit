@@ -72,8 +72,8 @@ const runtime = createCommitRuntime({
 
   const parsed = runtime.parseCodexJsonl([
     JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(structured) } }),
-    JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } })
-  ].join('\n')+'\n');
+    JSON.stringify({ type: 'turn.completed' })
+  ].join('\n'));
   assert.strictEqual(parsed, JSON.stringify(structured));
   assert.throws(() => runtime.parseCodexJsonl('{bad json'), /invalid JSONL/i);
 
