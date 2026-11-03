@@ -1,3 +1,10 @@
+## 4.6.7
+
+- Preserve manually edited SCM commit message drafts during asynchronous generation; show generated alternatives without overwriting user input.
+- Recheck operation cancellation, staged-index and HEAD identity before publishing; compare-and-set and safely retract stale generated values.
+- Include deterministic controller and Extension Host regressions with terminal JSONL fixture ordering.
+- Gate Release Integrity on a real successful publish; preserve previous immutable tags on unchanged-version pushes.
+
 ## 4.6.6
 
 - Repin to Codex Safe Core 4.18.2 because the shipped Core runtime digest changed to `d50d065c716dcb5b70f9cdd832ea05e6a9d49617bc6582567b3c69a7fb133d6e`; publish a new immutable product release and required distribution evidence.
