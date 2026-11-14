@@ -22,6 +22,7 @@ let nextGenerationId = 1;
 const { runPreparedProcess, runProcess, runProcessBuffer } = createProcessRunner(ui);
 const {
   git,
+  getRepositoryRoot,
   getRepositoryStyleGuidance,
   normalizeFsPath,
   repositoryFromCommandContext,
@@ -37,7 +38,7 @@ const {
 const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
 const { getEffectiveOptions } = createCommitPolicy({ ui, readProjectRulesAtHead });
 const { getRepositories, chooseRepository, compareAndSetCommitInput, getCurrentCommitInput } = createRepositoryUi({
-  git,
+  getRepositoryRoot,
   normalizeFsPath,
   repositoryFromCommandContext,
   ui

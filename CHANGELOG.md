@@ -1,8 +1,14 @@
+## 4.6.9
+
+- Preserve exact Git repository roots when the VS Code Git API is unavailable. Read bounded binary output, decode UTF-8 strictly, and remove only Git's line terminator so whitespace, newlines and BOM cannot select a neighboring repository.
+- Require the selected workspace folder to belong to the physically resolved root; reject outside-root responses and unsupported filename bytes before staged evidence or SCM publication.
+- Add real adjacent-repository regressions and retain the existing Git API selection and draft-preservation behavior. Core remains pinned to released 4.18.5; correct the 4.6.8 changelog entry to match its published contract.
+
 ## 4.6.8
 
 - Qualify the locked VSCE 4.1.1 dependency graph and scoped minimatch security fix with deterministic credential-boundary tests and actual VSIX packaging.
 - Enforce actual CodeQL SARIF findings and full dependency audits; publish exact release assets with locked tooling and truthful completion status.
-- Repin to Codex Safe Core 4.18.4 because the shipped Core runtime digest changed to `f36b7c158ba188989f456d60c55c9974467d166e1b5bea52a0f7bbee4309c548`; publish a new immutable product release and required distribution evidence.
+- Repin to Codex Safe Core 4.18.5 because the shipped Core runtime digest changed to `affb2f6f680d8efcdf8ed6a3c5fbd7b009396883be543684f890a82488be2e6c`; publish a new immutable product release and required distribution evidence.
 - Refresh Product Contract v2 and generated/current-state Family identity for the exact Core pin.
 
 ## 4.6.7
