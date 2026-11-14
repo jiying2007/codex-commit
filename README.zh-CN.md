@@ -41,7 +41,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - Safe Contract v2 使用 ephemeral/read-only/no-approval，并显式关闭 shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency install；
 - 不自动修改源码、Commit 或 Push。
 
-共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.18.4**，SHA 为 `31b94d4c1bddbe9988225eccf632a669d8b124f0`。
+共享安全/runtime 与 Repository Policy 校验只来自精确 commit-pinned 的 **Codex Safe Core 4.18.5**，SHA 为 `ac5203e1b65ffdca26064c0887537f64d2a8a6cb`。
 
 ## Repository Policy
 
@@ -49,7 +49,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/31b94d4c1bddbe9988225eccf632a669d8b124f0/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/ac5203e1b65ffdca26064c0887537f64d2a8a6cb/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "zh-CN",

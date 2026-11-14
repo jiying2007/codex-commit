@@ -17,10 +17,10 @@ npm run package
 
 A release is valid only when:
 
-- package and lockfile metadata agree;
+- `package.json`, both lockfile version fields, and `product-contract.json.productVersion` agree;
 - `src/codex-safe-core` is a `160000` gitlink at the coordinated reviewed Core commit;
 - `.codex-safe.example.json` schema provenance points to the same Core commit;
-- Safe Core v4 / Safe Contract v2 / Policy Schema v3 / Commit Receipt v4 / Prompt Contract v1 checks pass;
+- Safe Core v4 / Safe Contract v2 / Policy Schema v4 / Commit Receipt v4 / Prompt Contract v1 checks pass;
 - unit, regression, provenance and module-boundary checks pass;
 - latest VS Code Extension Host tests pass on Linux, Windows and macOS;
 - minimum VS Code `1.90.0` passes;
@@ -43,6 +43,8 @@ git diff
 npm run release:check
 npm run release:push
 ```
+
+The local helper prepares exactly `package.json`, `package-lock.json`, `product-contract.json`, and `CHANGELOG.md`. It rejects inconsistent existing metadata and unrelated file changes; the product contract may change only its `productVersion` field.
 
 A committed version change on `main` owns publication. Validation jobs remain read-only; only the final release job receives `contents: write`, `id-token: write`, and `attestations: write`. Third-party Actions remain immutable full-SHA pinned.
 
