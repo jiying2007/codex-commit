@@ -144,7 +144,7 @@ assert.doesNotMatch(marketplace,/\n  workflow_run:\n/,'Marketplace must not auto
 assert.match(marketplace,/gh release download/);
 assert.match(marketplace,/sha256sum -c SHA256SUMS/);
 assert.match(marketplace,/gh attestation verify .* -R "\$GITHUB_REPOSITORY"/);
-assert.match(marketplace,/@vscode\/vsce@3\.9\.2 publish --packagePath/);
+assert.match(marketplace,/node node_modules\/@vscode\/vsce\/vsce publish --packagePath/);
 assert.match(marketplace,new RegExp(`distribution-receipt\\.yml@${contract.safeCoreCommit}`));
 assert.match(marketplace,/channel: vscode-marketplace/);
 assert.doesNotMatch(marketplace,/npm run package|vsce package/,'Marketplace must publish exact GitHub Release VSIX without rebuilding');

@@ -7,13 +7,14 @@ const { createGitRepository } = require('../src/git-repository');
 const ui = (_zh, en) => en;
 const head = 'a'.repeat(40);
 const indexBytes = Buffer.from('100644 abc 0\tfile.c\0', 'utf8');
+const stagedPaths = ['src/a.c', 'docs/readme.md', 'src\\a.c', ' edge.c ', 'line\nbreak.c', '\uFEFFlead.c'];
 const calls = [];
 
 const repo = createGitRepository({
   runProcess: async (command, args, options) => {
     calls.push({ command, args, options });
     if (args[0] === 'rev-parse') return { stdout: `${head}\n`, stderr: '' };
-    if (args[0] === 'diff' && args.includes('--name-only')) return { stdout: 'src/a.c\0docs/readme.md\0', stderr: '' };
+    if (args[0] === 'diff' && args.includes('--name-only')) throw new Error('Path inventories must use the binary runner.');
     if (args[0] === 'diff') return { stdout: 'diff --git a/src/a.c b/src/a.c\n+change\n', stderr: '' };
     if (args[0] === 'ls-files' && args[1] === '-u') return { stdout: '', stderr: '' };
     if (args[0] === 'log') return { stdout: 'fix(core): repair race\0feat(core): add guard\0chore(core): update metadata\0', stderr: '' };
@@ -21,14 +22,21 @@ const repo = createGitRepository({
     if (args[0] === 'show') return { stdout: '{"schemaVersion":4,"commit":{"language":"en","styleHistoryLimit":12}}', stderr: '' };
     throw new Error(`unexpected git args: ${args.join(' ')}`);
   },
-  runProcessBuffer: async () => ({ stdout: indexBytes, stderr: Buffer.alloc(0) }),
+  runProcessBuffer: async (command, args, options) => {
+    calls.push({ command, args, options });
+    if (args[0] === 'diff' && args.includes('--name-only') && args.includes('-z')) {
+      return { stdout: Buffer.from(stagedPaths.join('\0') + '\0', 'utf8'), stderr: Buffer.alloc(0) };
+    }
+    assert.deepStrictEqual(args, ['ls-files', '--stage', '-z']);
+    return { stdout: indexBytes, stderr: Buffer.alloc(0) };
+  },
   ui
 });
 
 (async () => {
   assert.strictEqual(await repo.getHeadOid('/repo'), head);
   assert.strictEqual(await repo.hasUnmergedEntries('/repo'), false);
-  assert.deepStrictEqual(await repo.getStagedPaths('/repo'), ['src/a.c', 'docs/readme.md']);
+  assert.deepStrictEqual(await repo.getStagedPaths('/repo'), stagedPaths);
   assert.match(await repo.getStagedDiff('/repo'), /^diff --git/);
   const fingerprint = crypto.createHash('sha256').update(indexBytes).digest('hex');
   assert.strictEqual(await repo.getIndexFingerprint('/repo'), fingerprint);
