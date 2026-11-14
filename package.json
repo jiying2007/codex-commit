@@ -2,7 +2,7 @@
   "name": "codex-commit-safe",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "4.6.7",
+  "version": "4.6.8",
   "publisher": "jiying2007",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -345,7 +345,7 @@
   },
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
-    "@vscode/vsce": "3.9.2",
+    "@vscode/vsce": "4.1.1",
     "esbuild": "0.28.2"
   },
   "repository": {
@@ -358,5 +358,10 @@
   },
   "pricing": "Free",
   "preview": false,
-  "icon": "images/icon.png"
+  "icon": "images/icon.png",
+  "overrides": {
+    "@vscode/vsce": {
+      "minimatch": "11.0.1"
+    }
+  }
 }
