@@ -3,7 +3,7 @@
 const vscode = require('vscode');
 const path = require('path');
 
-function createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext, ui }) {
+function createRepositoryUi({ getRepositoryRoot, normalizeFsPath, repositoryFromCommandContext, ui }) {
   async function getGitApi() {
     const extension = vscode.extensions.getExtension('vscode.git');
     if (!extension) return undefined;
@@ -18,8 +18,7 @@ function createRepositoryUi({ git, normalizeFsPath, repositoryFromCommandContext
     const seen = new Set();
     for (const folder of vscode.workspace.workspaceFolders || []) {
       try {
-        const { stdout } = await git(['rev-parse', '--show-toplevel'], folder.uri.fsPath);
-        const root = stdout.trim();
+        const root = await getRepositoryRoot(folder.uri.fsPath);
         const key = normalizeFsPath(root);
         if (root && !seen.has(key)) {
           seen.add(key);
