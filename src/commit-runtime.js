@@ -271,7 +271,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     }
 
     const files = [...new Set(stagedPaths.map(file => {
-      if (typeof file !== 'string' || !file || file.includes('\\0')) {
+      if (typeof file !== 'string' || !file || file.includes('\0')) {
         throw new TypeError('Staged paths must be nonempty strings without NUL.');
       }
       return file;
@@ -304,7 +304,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       sourceBlocks.push(block.text);
     }
 
-    const sourceDiff = sourceBlocks.join('\\n');
+    const sourceDiff = sourceBlocks.join('\n');
     const countKind = kind => files.filter(file => safeCore.classifyPath(file) === kind).length;
     return Object.freeze({
       files: Object.freeze(files),
