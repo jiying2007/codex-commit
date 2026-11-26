@@ -1,3 +1,9 @@
+# Changelog
+
+## Unreleased
+
+- Resolve staged Diff blocks against the staged path inventory before semantic analysis; binary/generated payloads and unmatched blocks are excluded from model context, while raw staged Diff remains available for provenance.
+
 ## 4.6.9
 
 - Preserve exact Git repository roots when the VS Code Git API is unavailable. Read bounded binary output, decode UTF-8 strictly, and remove only Git's line terminator so whitespace, newlines and BOM cannot select a neighboring repository.
@@ -83,8 +89,6 @@
 - Keep Commit message generation fresh-only; no Judgment replay or model-result persistence is introduced.
 - Treat only current-session Review provenance as current when attaching Review evidence to Commit receipts.
 
-# Changelog
-
 ## 4.4.1 - 2026-09-02
 
 - Release-only patch carrying the exact Codex Safe Core 4.12.4 family pin and validated commit/runtime contracts; no Commit Safe runtime semantics change.
@@ -109,10 +113,6 @@
 ## 4.2.0 - 2026-08-28
 
 - Consume Core v4.6 Codex Runtime/Provider Contract, add explicit OpenAI-compatible relay configuration, live Environment Check, split runtime timeouts and provider-aware diagnostics while keeping Safe Contract isolation.
-
-## Unreleased
-
-- Resolve staged Diff blocks against the staged path inventory before semantic analysis; binary/generated payloads and unmatched blocks are excluded from model context, while raw staged Diff remains available for provenance.
 
 ## 4.2.2 - 2026-08-30
 
