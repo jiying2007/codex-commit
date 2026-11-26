@@ -41,6 +41,8 @@ function loadSafeCore() {
     typeof safeCoreModule?.classifyPath !== 'function' ||
     typeof safeCoreModule?.scoreEvidenceRisk !== 'function' ||
     typeof safeCoreModule?.adaptiveBudget !== 'function' ||
+    typeof safeCoreModule?.planRequestContextBudget !== 'function' ||
+    typeof safeCoreModule?.TokenEstimatorCalibration !== 'function' ||
     typeof safeCoreModule?.selectModel !== 'function' ||
     typeof safeCoreModule?.resolveModelSelection !== 'function' ||
     typeof safeCoreModule?.buildModelEvidence !== 'function'
@@ -53,6 +55,11 @@ function loadSafeCore() {
 /** @param {{ runPreparedProcess: RunPreparedProcessFn, ui: UiFn }} deps */
 function createCommitRuntime({ runPreparedProcess, ui }) {
   const safeCore = loadSafeCore();
+  const tokenCalibration = new safeCore.TokenEstimatorCalibration({
+    defaultBytesPerToken: 2,
+    minSamples: 3,
+    safetyMargin: 0.15
+  });
   const cli = safeCore.createCodexCli({
     runPreparedProcess,
     tempPrefix: 'codex-commit-'
@@ -329,12 +336,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     const prompt = buildPrompt(options, preferredScope, previousMessage, repositoryStyleGuidance);
     const paths = stagedInput.files;
     const riskScore = safeCore.scoreEvidenceRisk({ paths, text: stagedInput.sourceDiff });
-    const contextBudgetBytes = safeCore.adaptiveBudget(options.maxDiffBytes, riskScore, { lowFactor: 0.35, mediumFactor: 0.65, min: 16 * 1024 });
-    const semanticContext = safeCore.buildSemanticContext({
-      files: stagedInput.files,
-      diff: stagedInput.sourceDiff,
-      maxBytes: contextBudgetBytes
-    });
+    const adaptiveContextCapBytes = safeCore.adaptiveBudget(options.maxDiffBytes, riskScore, { lowFactor: 0.35, mediumFactor: 0.65, min: 16 * 1024 });
     let model=String(options.model||'').trim(),modelSelection=null;
     if(options.modelRegistry){
       const strategy=String(options.modelSelectionStrategy||'auto'),provider=String(options.codexRuntimeInspection?.providerId||options.codexRuntime?.provider?.mode||'').trim();
@@ -344,16 +346,37 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       modelSelection=safeCore.resolveModelSelection(request);
       model=modelSelection.resolvedModel;
     }
-    const input = [
-      prompt,
-      '',
-      '--- STAGED GIT CONTEXT START ---',
-      semanticContext.text,
-      '--- STAGED GIT CONTEXT END ---',
-      ''
-    ].join('\n');
     const automaticTokenCap = Math.max(8192, Math.ceil(Number(options.maxDiffBytes || 0) / 2) + 4096);
     const maxEstimatedTokens = Number(options.maxTokenBudget) > 0 ? Number(options.maxTokenBudget) : automaticTokenCap;
+    const fixedPrefix = [
+      prompt,
+      '',
+      '--- STAGED GIT CONTEXT START ---'
+    ].join('\\n') + '\\n';
+    const fixedSuffix = '\\n--- STAGED GIT CONTEXT END ---\\n';
+    const configuredProvider = String(options.codexRuntimeInspection?.providerId || options.codexRuntime?.provider?.mode || 'default');
+    const bytesPerToken = tokenCalibration.bytesPerToken(configuredProvider, model || 'default');
+    const requestBudget = safeCore.planRequestContextBudget({
+      prefix: fixedPrefix,
+      suffix: fixedSuffix,
+      maxTokens: maxEstimatedTokens,
+      estimatedOutputTokens: 1024,
+      reserveTokens: 1024,
+      bytesPerToken,
+      maxContextBytes: adaptiveContextCapBytes
+    });
+    if (requestBudget.contextBytes < 4096) {
+      const error = new Error('Structured request has insufficient budget for the minimum semantic context.');
+      error.code = 'ETOKENBUDGET';
+      error.budgetPlan = requestBudget;
+      throw error;
+    }
+    const semanticContext = safeCore.buildSemanticContext({
+      files: stagedInput.files,
+      diff: stagedInput.sourceDiff,
+      maxBytes: requestBudget.contextBytes
+    });
+    const input = fixedPrefix + semanticContext.text + fixedSuffix;
     try {
       const result = await cli.runStructuredCodex({
         codexPath: options.codexPath,
@@ -364,7 +387,13 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
         schemaFileName: 'commit-schema.json',
         token,
         maxEstimatedTokens,
-        estimatedOutputTokens: 1024
+        estimatedOutputTokens: requestBudget.estimatedOutputTokens,
+        estimateBytesPerToken: requestBudget.bytesPerToken
+      });
+      const calibrationProvider = String(result.provider?.endpointHost || result.provider?.mode || configuredProvider);
+      const calibration = tokenCalibration.observe(calibrationProvider, model || 'default', {
+        bytes: result.requestEstimate.bytes,
+        usage: result.usage
       });
       const structured = validateStructuredResult(result.parsed, options);
       Object.defineProperty(structured, 'executionMeta', {
@@ -373,7 +402,18 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
           requestedModel: options.model || '',
           resolvedModel: model || '',
           riskScore,
-          contextBudgetBytes,
+          contextBudgetBytes: requestBudget.contextBytes,
+          adaptiveContextCapBytes,
+          requestBudget: Object.freeze({
+            maxTokens: requestBudget.maxTokens,
+            fixedTokens: requestBudget.fixedTokens,
+            estimatedOutputTokens: requestBudget.estimatedOutputTokens,
+            reserveTokens: requestBudget.reserveTokens,
+            bytesPerToken: requestBudget.bytesPerToken,
+            contextBytes: requestBudget.contextBytes,
+            calibrationSamples: calibration.samples,
+            calibrationActive: calibration.active
+          }),
           inputDiffBytes: stagedInput.rawDiffBytes,
           semanticDiffBytes: semanticContext.inputDiffBytes,
           semanticContextBytes: Buffer.byteLength(semanticContext.text, 'utf8'),
