@@ -49,6 +49,11 @@ function controller({ runModel, reviewEvidence, snapshotAt, loadPolicy, notifica
       }) };
       if (request === './src/commit-runtime') return { createCommitRuntime:() => ({
         formatCommitMessage:value => value.description,
+        prepareStagedDiff:(diff, files) => ({
+          files, sourceDiff:diff, rawDiffBytes:Buffer.byteLength(diff, 'utf8'), sourceDiffBytes:Buffer.byteLength(diff, 'utf8'),
+          sourceFileCount:files.length, generatedFileCount:0, binaryFileCount:0,
+          excludedBinaryDiffBlocks:0, excludedGeneratedDiffBlocks:0, unmappedDiffBlocks:0
+        }),
         runCodex:async () => { const number = ++modelCalls; if (runModel) await runModel(number); return { description:`generated-${number}` }; }
       }) };
       if (request === './src/receipts') return { fingerprintCommitMessage:() => 'd'.repeat(64), createCommitReceiptStore:() => ({ restore() {}, persistPending:async (_root, receipt) => { receipts.push(receipt); } }) };
