@@ -112,6 +112,8 @@
 
 ## Unreleased
 
+- Resolve staged Diff blocks against the staged path inventory before semantic analysis; binary/generated payloads and unmatched blocks are excluded from model context, while raw staged Diff remains available for provenance.
+
 ## 4.2.2 - 2026-08-30
 
 - Repin to immutable Codex Safe Core v4.8.1 (`d06383ecf58b8153ddbd9d0b26a4f83b6e0515c2`) after the Family workspace/test-stability maintenance line; preserve Commit runtime behavior, Safe Contract v2, Policy Schema v3 and Receipt/Prompt contracts.
