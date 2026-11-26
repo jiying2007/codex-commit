@@ -1,7 +1,7 @@
 {
   "productContractVersion": 2,
   "productId": "codex-commit-safe",
-  "productVersion": "4.6.10",
+  "productVersion": "4.6.11",
   "safeCoreVersion": "4.18.11",
   "safeCoreCommit": "13727c90caeb8b0a6029471d8b5ef49f2d06e6d2",
   "safeCoreMajorVersion": 4,
