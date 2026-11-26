@@ -144,7 +144,7 @@ const runtime = createCommitRuntime({
     '@@ -1 +1 @@',
     '-const safe = false;',
     '+const safe = true;'
-  ].join('\n'), 'utf8'));
+  ].join('\n') + '\n', 'utf8'));
 
   // A non-canonical Git diff prefix must not make a staged .bin file default
   // to source. The full binary payload remains local and metadata-only.
