@@ -144,7 +144,7 @@ const runtime = createCommitRuntime({
     '@@ -1 +1 @@',
     '-const safe = false;',
     '+const safe = true;'
-  ].join('\\n'), 'utf8'));
+  ].join('\n'), 'utf8'));
 
   // A non-canonical Git diff prefix must not make a staged .bin file default
   // to source. The full binary payload remains local and metadata-only.
@@ -155,7 +155,7 @@ const runtime = createCommitRuntime({
     'GIT binary patch',
     'literal 400000',
     binaryPayload
-  ].join('\\n');
+  ].join('\n');
   const binaryInput = runtime.prepareStagedDiff(unprefixedBinaryDiff, ['firmware/robot.bin']);
   assert.strictEqual(binaryInput.binaryFileCount, 1);
   assert.strictEqual(binaryInput.sourceFileCount, 0);
@@ -165,8 +165,8 @@ const runtime = createCommitRuntime({
   const binaryResult = await runtime.runCodex(binaryInput, options, '', '', []);
   const binaryExecution = calls.slice(binaryCallStart).find(call => call.args.includes('exec') && call.args.includes('--output-schema'));
   assert(binaryExecution, 'binary-only staged snapshot did not reach structured execution');
-  assert.match(binaryExecution.stdinText, /Binary files \\(1, metadata only\\):/);
-  assert.match(binaryExecution.stdinText, /firmware\\/robot\\.bin/);
+  assert.match(binaryExecution.stdinText, /Binary files \(1, metadata only\):/);
+  assert.match(binaryExecution.stdinText, /firmware\/robot\.bin/);
   assert.doesNotMatch(binaryExecution.stdinText, /A{1024}/);
   assert.strictEqual(binaryResult.executionMeta.inputDiffBytes, Buffer.byteLength(unprefixedBinaryDiff, 'utf8'));
   assert.strictEqual(binaryResult.executionMeta.semanticDiffBytes, 0);
@@ -186,7 +186,7 @@ const runtime = createCommitRuntime({
     '@@ -1 +1 @@',
     '-old',
     '+new'
-  ].join('\\n');
+  ].join('\n');
   const ambiguousInput = runtime.prepareStagedDiff(ambiguousDiff, ['firmware/robot.bin', 'src/main.c']);
   assert.strictEqual(ambiguousInput.unmappedDiffBlocks, 2);
   assert.strictEqual(ambiguousInput.sourceDiff, '');
@@ -199,7 +199,7 @@ const runtime = createCommitRuntime({
     '@@ -1 +1 @@',
     '-old',
     '+new'
-  ].join('\\n');
+  ].join('\n');
   const unprefixedSource = runtime.prepareStagedDiff(unprefixedSourceDiff, ['src/main.c']);
   assert.strictEqual(unprefixedSource.sourceDiff, unprefixedSourceDiff);
   assert.strictEqual(unprefixedSource.includedSourceDiffBlocks, 1);
