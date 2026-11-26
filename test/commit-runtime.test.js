@@ -136,7 +136,7 @@ const runtime = createCommitRuntime({
   assert(execution, 'Safe Core structured execution was not invoked');
   assert.match(execution.stdinText, /--- STAGED GIT CONTEXT START ---/);
   assert.match(execution.stdinText, /Source files \(1\):/);
-  assert.match(execution.stdinText, /Generated\/lock files \(1, metadata only\):/);
+  assert.match(execution.stdinText, /Generated\\/lock files, metadata only \\(1\\):/);
   assert.match(execution.stdinText, /\+const safe = true/);
   assert.doesNotMatch(execution.stdinText, /\+\{"lock":2\}/);
   assert.strictEqual(execution.options.timeoutMs, options.codexRuntime.timeouts.requestMs);
@@ -171,7 +171,7 @@ const runtime = createCommitRuntime({
   const binaryResult = await runtime.runCodex(binaryInput, options, '', '', []);
   const binaryExecution = calls.slice(binaryCallStart).find(call => call.args.includes('exec') && call.args.includes('--output-schema'));
   assert(binaryExecution, 'binary-only staged snapshot did not reach structured execution');
-  assert.match(binaryExecution.stdinText, /Binary files \(1, metadata only\):/);
+  assert.match(binaryExecution.stdinText, /Binary files, metadata only \\(1\\):/);
   assert.match(binaryExecution.stdinText, /firmware\/robot\.bin/);
   assert.doesNotMatch(binaryExecution.stdinText, /A{1024}/);
   assert.strictEqual(binaryResult.executionMeta.inputDiffBytes, Buffer.byteLength(unprefixedBinaryDiff, 'utf8'));
