@@ -189,7 +189,7 @@ const runtime = createCommitRuntime({
     '@@ -1 +1 @@',
     '-old',
     '+new'
-  ].join('\\n');
+  ].join('\n');
   const inventoryInput = runtime.prepareStagedDiff(inventoryDiff, inventoryPaths);
   const inventoryStart = calls.length;
   const inventoryResult = await runtime.runCodex(inventoryInput, options, '', '', []);
