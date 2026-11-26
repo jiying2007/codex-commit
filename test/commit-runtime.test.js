@@ -118,6 +118,12 @@ const runtime = createCommitRuntime({
   assert.ok(Number.isInteger(result.executionMeta.riskScore));
   assert.ok(result.executionMeta.contextBudgetBytes <= options.maxDiffBytes);
   assert.ok(result.executionMeta.requestEstimate.totalTokens > 0);
+  assert.equal(result.executionMeta.requestBudget.reserveTokens, 1024);
+  assert.equal(result.executionMeta.requestBudget.estimatedOutputTokens, 1024);
+  assert.ok(result.executionMeta.requestBudget.fixedTokens > 0);
+  assert.ok(result.executionMeta.semanticContextBytes <= result.executionMeta.requestBudget.contextBytes);
+  assert.ok(result.executionMeta.requestEstimate.totalTokens <= result.executionMeta.maxEstimatedTokens);
+  assert.equal(result.executionMeta.requestBudget.calibrationSamples, 1);
   assert.deepStrictEqual(result.executionMeta.usage, {
     inputTokens: 120,
     cachedInputTokens: 40,
@@ -172,6 +178,28 @@ const runtime = createCommitRuntime({
   assert.strictEqual(binaryResult.executionMeta.semanticDiffBytes, 0);
   assert.strictEqual(binaryResult.executionMeta.excludedBinaryDiffBlocks, 1);
   assert.ok(binaryResult.executionMeta.requestEstimate.totalTokens < 8192);
+
+  // A large binary inventory must not consume the complete request budget.
+  const binaryInventory = Array.from({ length: 900 }, (_, index) => `artifacts/${String(index).padStart(4, '0')}.BIN`);
+  const inventoryPaths = [...binaryInventory, 'src/main.c'];
+  const inventoryDiff = [
+    'diff --git a/src/main.c b/src/main.c',
+    '--- a/src/main.c',
+    '+++ b/src/main.c',
+    '@@ -1 +1 @@',
+    '-old',
+    '+new'
+  ].join('\\n');
+  const inventoryInput = runtime.prepareStagedDiff(inventoryDiff, inventoryPaths);
+  const inventoryStart = calls.length;
+  const inventoryResult = await runtime.runCodex(inventoryInput, options, '', '', []);
+  const inventoryExecution = calls.slice(inventoryStart).find(call => call.args.includes('exec') && call.args.includes('--output-schema'));
+  assert(inventoryExecution, 'large binary inventory did not reach structured execution');
+  assert.ok(inventoryResult.executionMeta.semanticContextBytes <= inventoryResult.executionMeta.requestBudget.contextBytes);
+  assert.ok(inventoryResult.executionMeta.requestEstimate.totalTokens <= inventoryResult.executionMeta.maxEstimatedTokens);
+  assert.equal(inventoryResult.executionMeta.binaryFileCount, 900);
+  assert.match(inventoryExecution.stdinText, /Binary files, metadata only/);
+  assert.doesNotMatch(inventoryExecution.stdinText, /artifacts\\/0899\\.BIN/);
 
   // Unknown multi-file blocks are omitted instead of being trusted as source.
   const ambiguousDiff = [
