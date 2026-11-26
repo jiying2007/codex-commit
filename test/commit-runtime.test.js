@@ -199,7 +199,7 @@ const runtime = createCommitRuntime({
   assert.ok(inventoryResult.executionMeta.requestEstimate.totalTokens <= inventoryResult.executionMeta.maxEstimatedTokens);
   assert.equal(inventoryResult.executionMeta.binaryFileCount, 900);
   assert.match(inventoryExecution.stdinText, /Binary files, metadata only/);
-  assert.doesNotMatch(inventoryExecution.stdinText, /artifacts\\/0899\\.BIN/);
+  assert.equal(inventoryExecution.stdinText.includes('artifacts/0899.BIN'), false);
 
   // Unknown multi-file blocks are omitted instead of being trusted as source.
   const ambiguousDiff = [
