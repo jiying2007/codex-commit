@@ -24,6 +24,7 @@ const VALID_TYPES = new Set([
  *   parseCodexJsonl: (stdout: string) => string,
  *   buildSemanticContext: (request: any) => any,
  *   splitUnifiedDiff: (diff: string) => any[],
+ *   classifyPath: (path: string) => 'source' | 'generated' | 'binary',
  *   scoreEvidenceRisk: (request: any) => number,
  *   adaptiveBudget: (cap: number, riskScore: number, options?: any) => number,
  *   selectModel: (request: any) => string
@@ -37,6 +38,7 @@ function loadSafeCore() {
     typeof safeCoreModule?.parseCodexJsonl !== 'function' ||
     typeof safeCoreModule?.buildSemanticContext !== 'function' ||
     typeof safeCoreModule?.splitUnifiedDiff !== 'function' ||
+    typeof safeCoreModule?.classifyPath !== 'function' ||
     typeof safeCoreModule?.scoreEvidenceRisk !== 'function' ||
     typeof safeCoreModule?.adaptiveBudget !== 'function' ||
     typeof safeCoreModule?.selectModel !== 'function' ||
@@ -76,7 +78,8 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       '5. Prefer semantic evidence from changed symbols and logic over weak path aliases. Generic terms such as sensor, service, entry, main, common, or core do not by themselves justify a domain scope.',
       '6. description should state purpose and behavior, not mechanically list filenames, and should not end with a period.',
       '7. For simple changes return an empty body array; for complex changes include only a few important points.',
-      '8. Return only schema-defined fields, with no explanation or alternative answer.'
+      '8. Return only schema-defined fields, with no explanation or alternative answer.',
+      '9. Binary/generated files are metadata-only. Never infer their internal contents; when no source diff is available, use conservative path-level wording.'
     ];
     if (options.scopePolicy === 'strict') {
       lines.push(`Strict scope policy: scope must be empty or one of: ${options.scopes.join(', ')}. Do not invent another scope.`);
@@ -248,13 +251,90 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     return cli.buildCodexArgs(schemaPath, model);
   }
 
-  /** @param {string} diff @param {any} options @param {string} preferredScope @param {string} previousMessage @param {string[]} repositoryStyleGuidance @param {any} [token] */
-  async function runCodex(diff, options, preferredScope, previousMessage, repositoryStyleGuidance, token) {
+  /**
+   * Resolve every diff block against the staged index inventory before allowing
+   * its contents into semantic context. Unknown blocks are never assumed to be
+   * source code. A one-file/one-block snapshot can be resolved unambiguously
+   * from the staged inventory even when Git uses non-canonical diff prefixes.
+   * @param {string} diff
+   * @param {string[]} stagedPaths
+   */
+  function prepareStagedDiff(diff, stagedPaths) {
+    const rawDiff = String(diff || '');
+    if (!Array.isArray(stagedPaths) || stagedPaths.length === 0) {
+      const error = new Error(ui(
+        '无法取得 staged 文件清单，已停止生成以避免把未知 Diff 当作源码发送。',
+        'The staged path inventory is unavailable. Generation stopped rather than treating unknown diff content as source.'
+      ));
+      error.code = 'ESTAGEDPATHS';
+      throw error;
+    }
+
+    const files = [...new Set(stagedPaths.map(file => {
+      if (typeof file !== 'string' || !file || file.includes('\\0')) {
+        throw new TypeError('Staged paths must be nonempty strings without NUL.');
+      }
+      return file;
+    }))];
+    const knownPaths = new Set(files);
+    const blocks = safeCore.splitUnifiedDiff(rawDiff);
+    const sourceBlocks = [];
+    let excludedBinaryDiffBlocks = 0;
+    let excludedGeneratedDiffBlocks = 0;
+    let unmappedDiffBlocks = 0;
+
+    for (const block of blocks) {
+      const parsedPath = typeof block?.path === 'string' ? block.path : '';
+      let stagedPath = knownPaths.has(parsedPath) ? parsedPath : '';
+      if (!stagedPath && blocks.length === 1 && files.length === 1) stagedPath = files[0];
+      if (!stagedPath) {
+        unmappedDiffBlocks += 1;
+        continue;
+      }
+
+      const kind = safeCore.classifyPath(stagedPath);
+      if (kind === 'binary') {
+        excludedBinaryDiffBlocks += 1;
+        continue;
+      }
+      if (kind === 'generated') {
+        excludedGeneratedDiffBlocks += 1;
+        continue;
+      }
+      sourceBlocks.push(block.text);
+    }
+
+    const sourceDiff = sourceBlocks.join('\\n');
+    const countKind = kind => files.filter(file => safeCore.classifyPath(file) === kind).length;
+    return Object.freeze({
+      files: Object.freeze(files),
+      sourceDiff,
+      rawDiffBytes: Buffer.byteLength(rawDiff, 'utf8'),
+      sourceDiffBytes: Buffer.byteLength(sourceDiff, 'utf8'),
+      sourceFileCount: countKind('source'),
+      generatedFileCount: countKind('generated'),
+      binaryFileCount: countKind('binary'),
+      includedSourceDiffBlocks: sourceBlocks.length,
+      excludedBinaryDiffBlocks,
+      excludedGeneratedDiffBlocks,
+      unmappedDiffBlocks
+    });
+  }
+
+  /** @param {ReturnType<typeof prepareStagedDiff>} stagedInput @param {any} options @param {string} preferredScope @param {string} previousMessage @param {string[]} repositoryStyleGuidance @param {any} [token] */
+  async function runCodex(stagedInput, options, preferredScope, previousMessage, repositoryStyleGuidance, token) {
+    if (!stagedInput || !Array.isArray(stagedInput.files) || typeof stagedInput.sourceDiff !== 'string') {
+      throw new TypeError('runCodex requires a prepared staged-diff inventory.');
+    }
     const prompt = buildPrompt(options, preferredScope, previousMessage, repositoryStyleGuidance);
-    const paths = safeCore.splitUnifiedDiff(diff).map(block => block.path);
-    const riskScore = safeCore.scoreEvidenceRisk({ paths, text: diff });
+    const paths = stagedInput.files;
+    const riskScore = safeCore.scoreEvidenceRisk({ paths, text: stagedInput.sourceDiff });
     const contextBudgetBytes = safeCore.adaptiveBudget(options.maxDiffBytes, riskScore, { lowFactor: 0.35, mediumFactor: 0.65, min: 16 * 1024 });
-    const semanticContext = safeCore.buildSemanticContext({ diff, maxBytes: contextBudgetBytes });
+    const semanticContext = safeCore.buildSemanticContext({
+      files: stagedInput.files,
+      diff: stagedInput.sourceDiff,
+      maxBytes: contextBudgetBytes
+    });
     let model=String(options.model||'').trim(),modelSelection=null;
     if(options.modelRegistry){
       const strategy=String(options.modelSelectionStrategy||'auto'),provider=String(options.codexRuntimeInspection?.providerId||options.codexRuntime?.provider?.mode||'').trim();
@@ -273,6 +353,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       ''
     ].join('\n');
     const automaticTokenCap = Math.max(8192, Math.ceil(Number(options.maxDiffBytes || 0) / 2) + 4096);
+    const maxEstimatedTokens = Number(options.maxTokenBudget) > 0 ? Number(options.maxTokenBudget) : automaticTokenCap;
     try {
       const result = await cli.runStructuredCodex({
         codexPath: options.codexPath,
@@ -282,7 +363,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
         input,
         schemaFileName: 'commit-schema.json',
         token,
-        maxEstimatedTokens: Number(options.maxTokenBudget) > 0 ? Number(options.maxTokenBudget) : automaticTokenCap,
+        maxEstimatedTokens,
         estimatedOutputTokens: 1024
       });
       const structured = validateStructuredResult(result.parsed, options);
@@ -293,7 +374,17 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
           resolvedModel: model || '',
           riskScore,
           contextBudgetBytes,
-          inputDiffBytes: semanticContext.inputDiffBytes,
+          inputDiffBytes: stagedInput.rawDiffBytes,
+          semanticDiffBytes: semanticContext.inputDiffBytes,
+          semanticContextBytes: Buffer.byteLength(semanticContext.text, 'utf8'),
+          sourceFileCount: stagedInput.sourceFileCount,
+          generatedFileCount: stagedInput.generatedFileCount,
+          binaryFileCount: stagedInput.binaryFileCount,
+          includedSourceDiffBlocks: stagedInput.includedSourceDiffBlocks,
+          excludedBinaryDiffBlocks: stagedInput.excludedBinaryDiffBlocks,
+          excludedGeneratedDiffBlocks: stagedInput.excludedGeneratedDiffBlocks,
+          unmappedDiffBlocks: stagedInput.unmappedDiffBlocks,
+          maxEstimatedTokens,
           requestEstimate: result.requestEstimate,
           usage: result.usage,
           durationMs: result.durationMs,
@@ -336,6 +427,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     probeCodexCapabilities,
     probeCodexRuntime: request => cli.probeCodexRuntime(request),
     buildCodexArgs,
+    prepareStagedDiff,
     runCodex,
     findWindowsCodexCandidates: cli.findWindowsCodexCandidates,
     withTemporaryDirectory: cli.withTemporaryDirectory
