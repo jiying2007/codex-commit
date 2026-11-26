@@ -354,7 +354,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       '--- STAGED GIT CONTEXT START ---'
     ].join('\n') + '\n';
     const fixedSuffix = '\n--- STAGED GIT CONTEXT END ---\n';
-    const configuredProvider = String(options.codexRuntimeInspection?.providerId || options.codexRuntime?.provider?.mode || 'default');
+    const configuredProvider = String(options.codexRuntime?.provider?.mode || 'openai');
     const bytesPerToken = tokenCalibration.bytesPerToken(configuredProvider, model || 'default');
     const requestBudget = safeCore.planRequestContextBudget({
       prefix: fixedPrefix,
@@ -390,7 +390,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
         estimatedOutputTokens: requestBudget.estimatedOutputTokens,
         estimateBytesPerToken: requestBudget.bytesPerToken
       });
-      const calibrationProvider = String(result.provider?.endpointHost || result.provider?.mode || configuredProvider);
+      const calibrationProvider = String(result.provider?.mode || configuredProvider);
       const calibration = tokenCalibration.observe(calibrationProvider, model || 'default', {
         bytes: result.requestEstimate.bytes,
         usage: result.usage
