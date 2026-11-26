@@ -352,8 +352,8 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       prompt,
       '',
       '--- STAGED GIT CONTEXT START ---'
-    ].join('\\n') + '\\n';
-    const fixedSuffix = '\\n--- STAGED GIT CONTEXT END ---\\n';
+    ].join('\n') + '\n';
+    const fixedSuffix = '\n--- STAGED GIT CONTEXT END ---\n';
     const configuredProvider = String(options.codexRuntimeInspection?.providerId || options.codexRuntime?.provider?.mode || 'default');
     const bytesPerToken = tokenCalibration.bytesPerToken(configuredProvider, model || 'default');
     const requestBudget = safeCore.planRequestContextBudget({
