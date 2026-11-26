@@ -35,7 +35,7 @@ const {
   fingerprintDiff,
   readProjectRulesAtHead
 } = createGitRepository({ runProcess, runProcessBuffer, ui });
-const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
+const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, prepareStagedDiff, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
 const { getEffectiveOptions } = createCommitPolicy({ ui, readProjectRulesAtHead });
 const { getRepositories, chooseRepository, compareAndSetCommitInput, getCurrentCommitInput } = createRepositoryUi({
   getRepositoryRoot,
@@ -202,10 +202,14 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
         }
         log(`input prepared: files=${stagedPaths.length}, diffBytes=${size}, modelBudgetBytes=${options.maxDiffBytes}`);
 
-        const impactScope = options.autoInferScope ? impactScopeHints(diff, options.scopes) : { hints: {}, signalCount: 0 };
+        const stagedInput = prepareStagedDiff(diff, stagedPaths);
+        log(
+          `staged context inventory: sourceFiles=${stagedInput.sourceFileCount}, binaryFiles=${stagedInput.binaryFileCount}, generatedFiles=${stagedInput.generatedFileCount}, sourceDiffBytes=${stagedInput.sourceDiffBytes}, excludedBinaryBlocks=${stagedInput.excludedBinaryDiffBlocks}, excludedGeneratedBlocks=${stagedInput.excludedGeneratedDiffBlocks}, unmappedBlocks=${stagedInput.unmappedDiffBlocks}`
+        );
+        const impactScope = options.autoInferScope ? impactScopeHints(stagedInput.sourceDiff, options.scopes) : { hints: {}, signalCount: 0 };
         const effectiveScopeHints = mergeScopeHints(options.scopeHints, impactScope.hints);
         const scopeDecision = options.autoInferScope
-          ? inferScopeDecision(stagedPaths, options.scopes, diff, effectiveScopeHints)
+          ? inferScopeDecision(stagedPaths, options.scopes, stagedInput.sourceDiff, effectiveScopeHints)
           : emptyScopeDecision();
         if (options.autoInferScope) log(`${summarizeScopeDecision(scopeDecision)}, impactSignals=${impactScope.signalCount}`);
         const preferredScope = scopeDecision.scope;
@@ -219,12 +223,16 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
         if (repositoryStyleGuidance.length) log(`repository style prior prepared: rules=${repositoryStyleGuidance.length}`);
 
         const structured = await runCodex(
-          diff,
+          stagedInput,
           options,
           preferredScope,
           previousMessage,
           repositoryStyleGuidance,
           token
+        );
+        const requestMeta = structured.executionMeta || {};
+        log(
+          `structured request estimate: ${requestMeta.requestEstimate?.totalTokens || 0}/${requestMeta.maxEstimatedTokens || 0} tokens; rawDiffBytes=${requestMeta.inputDiffBytes || 0}; semanticContextBytes=${requestMeta.semanticContextBytes || 0}`
         );
         const diffFingerprint = await fingerprintDiff(diff);
         return { structured, repositorySnapshot: snapshotAfter, diffFingerprint };
