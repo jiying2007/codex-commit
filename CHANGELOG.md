@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
-
 ## 4.6.11
 
 - Resolve staged Diff blocks against the staged path inventory before semantic analysis; binary/generated payloads and unmatched blocks are excluded from model context, while raw staged Diff remains available for provenance.
 - Allocate semantic context from the complete Prompt + Context + output + safety-reserve budget; retain the final request hard gate and calibrate bytes/token per provider/model from numeric usage only.
 - Pin released Safe Core 4.18.11; bound large binary-file inventories and preserve binary payload isolation.
+
+## Unreleased
 
 ## 4.6.9
 
