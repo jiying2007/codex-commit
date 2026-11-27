@@ -24,6 +24,7 @@ const VALID_TYPES = new Set([
  *   parseCodexJsonl: (stdout: string) => string,
  *   buildSemanticContext: (request: any) => any,
  *   splitUnifiedDiff: (diff: string) => any[],
+ *   quoteGitPath: (path: string) => string,
  *   classifyPath: (path: string) => 'source' | 'generated' | 'binary',
  *   scoreEvidenceRisk: (request: any) => number,
  *   adaptiveBudget: (cap: number, riskScore: number, options?: any) => number,
@@ -38,6 +39,7 @@ function loadSafeCore() {
     typeof safeCoreModule?.parseCodexJsonl !== 'function' ||
     typeof safeCoreModule?.buildSemanticContext !== 'function' ||
     typeof safeCoreModule?.splitUnifiedDiff !== 'function' ||
+    typeof safeCoreModule?.quoteGitPath !== 'function' ||
     typeof safeCoreModule?.classifyPath !== 'function' ||
     typeof safeCoreModule?.scoreEvidenceRisk !== 'function' ||
     typeof safeCoreModule?.adaptiveBudget !== 'function' ||
@@ -261,8 +263,9 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
   /**
    * Resolve every diff block against the staged index inventory before allowing
    * its contents into semantic context. Unknown blocks are never assumed to be
-   * source code. A one-file/one-block snapshot can be resolved unambiguously
-   * from the staged inventory even when Git uses non-canonical diff prefixes.
+   * source code. Only an exact, unchanged no-prefix path in a single-file
+   * header may be bound without canonical a/b prefixes. Missing or unmapped
+   * blocks make the collected inventory incomplete and stop generation.
    * @param {string} diff
    * @param {string[]} stagedPaths
    */
@@ -287,6 +290,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     const blocks = safeCore.splitUnifiedDiff(rawDiff);
     const fileKinds = new Map(files.map(file => [file, safeCore.classifyPath(file)]));
     const mappedBlocks = [];
+    const mappedPaths = new Set();
     const sourceBlocks = [];
     let excludedBinaryDiffBlocks = 0;
     let excludedGeneratedDiffBlocks = 0;
@@ -295,7 +299,12 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     for (const block of blocks) {
       const parsedPath = typeof block?.path === 'string' ? block.path : '';
       let stagedPath = knownPaths.has(parsedPath) ? parsedPath : '';
-      if (!stagedPath && blocks.length === 1 && files.length === 1) stagedPath = files[0];
+      if (!stagedPath && parsedPath === '<unknown>' && blocks.length === 1 && files.length === 1) {
+        const file = files[0];
+        const header = String(block.text || '').split('\n', 1)[0];
+        const quoted = safeCore.quoteGitPath(file);
+        if (header === `diff --git ${file} ${file}` || header === `diff --git ${quoted} ${quoted}`) stagedPath = file;
+      }
       if (!stagedPath) {
         unmappedDiffBlocks += 1;
         continue;
@@ -304,6 +313,17 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       // Promote before selecting source blocks so binary evidence never downgrades.
       if (block.kind === 'binary') fileKinds.set(stagedPath, 'binary');
       mappedBlocks.push({ block, stagedPath });
+      mappedPaths.add(stagedPath);
+    }
+    const missingDiffPaths = files.filter(file => !mappedPaths.has(file)).length;
+    // Do not present a complete staged snapshot when a block was discarded,
+    // or when a listed file has no corresponding raw diff block.
+    if (unmappedDiffBlocks || missingDiffPaths || !rawDiff.startsWith('diff --git ')) {
+      const error = Object.assign(new Error(ui(
+        `staged 文件清单与 Diff 无法完整匹配（未映射块 ${unmappedDiffBlocks}，缺失文件 ${missingDiffPaths}）。请检查 Git Diff 配置并重新生成。`,
+        `Staged file inventory and diff cannot be fully matched (unmapped blocks: ${unmappedDiffBlocks}, missing files: ${missingDiffPaths}). Check Git diff configuration and retry.`
+      )), { code: 'ESTAGEDDIFFINCOMPLETE', unmappedDiffBlocks, missingDiffPaths });
+      throw error;
     }
 
     for (const { block, stagedPath } of mappedBlocks) {
