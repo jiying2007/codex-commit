@@ -48,6 +48,18 @@ function log(message) {
   outputChannel?.appendLine(`[${new Date().toISOString()}] ${message}`);
 }
 
+function logBudgetFailure(error) {
+  if (error?.code !== 'ETOKENBUDGET') return;
+  const plan = error.budgetPlan;
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return;
+  const fields = [];
+  for (const key of ['maxTokens', 'fixedBytes', 'fixedTokens', 'estimatedOutputTokens', 'reserveTokens', 'availableTokens', 'contextBytes', 'bytesPerToken']) {
+    const value = plan[key];
+    if (typeof value === 'number' && Number.isFinite(value)) fields.push(`${key}=${value}`);
+  }
+  if (fields.length) log(`request budget failure: code=ETOKENBUDGET; ${fields.join(', ')}`);
+}
+
 function assertTrustedWorkspace() {
   if (!vscode.workspace.isTrusted) {
     throw new Error(ui(
@@ -369,6 +381,7 @@ function activate(context) {
         await generate({ regenerate: false, commandArgs: args });
       } catch (error) {
         log(`generation failed: code=${error?.code || 'unknown'}`);
+        logBudgetFailure(error);
         if (error?.code !== 'ECANCELLED') vscode.window.showErrorMessage(ui(
           `Codex Commit Safe 生成失败：${friendlyError(error)}`,
           `Codex Commit Safe generation failed: ${friendlyError(error)}`
@@ -380,6 +393,7 @@ function activate(context) {
         await generate({ regenerate: true, commandArgs: args });
       } catch (error) {
         log(`regeneration failed: code=${error?.code || 'unknown'}`);
+        logBudgetFailure(error);
         if (error?.code !== 'ECANCELLED') vscode.window.showErrorMessage(ui(
           `Codex Commit Safe 重新生成失败：${friendlyError(error)}`,
           `Codex Commit Safe regeneration failed: ${friendlyError(error)}`

@@ -10,7 +10,7 @@ const repositoryUiPath = path.resolve(__dirname, '..', 'src', 'repository-ui.js'
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 
 function controller({ runModel, reviewEvidence, snapshotAt, loadPolicy, notificationAction } = {}) {
-  const commands = new Map(), writes = [], receipts = [], notifications = [], previews = [], cancellationSources = [];
+  const commands = new Map(), writes = [], receipts = [], notifications = [], previews = [], cancellationSources = [], logs = [];
   let inputValue = '', snapshots = 0, modelCalls = 0, evidenceCalls = 0, policyCalls = 0;
   const inputBox = {};
   Object.defineProperty(inputBox, 'value', { get:() => inputValue, set:value => { inputValue = value; writes.push(value); } });
@@ -30,7 +30,7 @@ function controller({ runModel, reviewEvidence, snapshotAt, loadPolicy, notifica
       showInformationMessage:(message, action) => { notifications.push(message); return Promise.resolve(notificationAction ? action : undefined); },
       showWarningMessage:message => { notifications.push(message); },
       showErrorMessage:message => { throw new Error(message); },
-      showTextDocument:async () => {}, setStatusBarMessage() {}, createOutputChannel:() => ({ appendLine() {}, dispose() {} })
+      showTextDocument:async () => {}, setStatusBarMessage() {}, createOutputChannel:() => ({ appendLine:line => logs.push(line), dispose() {} })
     },
     commands:{ registerCommand:(name, operation) => { commands.set(name, operation); return { dispose() {} }; } }
   };
@@ -69,7 +69,7 @@ function controller({ runModel, reviewEvidence, snapshotAt, loadPolicy, notifica
     implementation = require(extensionPath);
   } finally { Module._load = originalLoad; }
   implementation.activate({ extensionMode:1, globalState:{}, subscriptions:[] });
-  return { generate:() => commands.get('safeCodexCommit.generate')(), cancel:() => cancellationSources[0].cancel(), edit:value => { inputValue = value; }, value:() => inputValue, writes, receipts, notifications, previews, dispose:() => implementation.deactivate() };
+  return { generate:() => commands.get('safeCodexCommit.generate')(), regenerate:() => commands.get('safeCodexCommit.regenerate')(), logs, cancel:() => cancellationSources[0].cancel(), edit:value => { inputValue = value; }, value:() => inputValue, writes, receipts, notifications, previews, dispose:() => implementation.deactivate() };
 }
 
 test('an unchanged draft receives the generated message and one pending receipt', async () => {
@@ -157,4 +157,43 @@ test('a user edit after publication prevents a pending receipt for a replaced dr
   app = controller({ snapshotAt:(number, snapshot) => { if (number >= 5) app.edit('new user draft'); return snapshot; } });
   try { await app.generate(); assert.equal(app.value(), 'new user draft'); assert.equal(app.receipts.length, 0); }
   finally { app.dispose(); }
+});
+
+
+test('both generation commands log only finite allowlisted budget numbers', async () => {
+  for (const operation of ['generate', 'regenerate']) {
+    const error = Object.assign(new Error('Budget exhausted'), {
+      code: 'ETOKENBUDGET',
+      prompt: 'PRIVATE_PROMPT', diff: 'PRIVATE_DIFF', diagnosticTail: 'SECRET_TOKEN',
+      budgetPlan: {
+        maxTokens: 8192, fixedBytes: 'PRIVATE_PATH', fixedTokens: 900,
+        estimatedOutputTokens: 1024, reserveTokens: 1024, availableTokens: -756,
+        contextBytes: 0, bytesPerToken: 2, prompt: 'PRIVATE_PROMPT',
+        payload: 'PRIVATE_DIFF', secret: 'SECRET_TOKEN', unknownCount: 123456
+      }
+    });
+    const app = controller({ runModel:async () => { throw error; } });
+    try {
+      await assert.rejects(app[operation](), /Budget exhausted/);
+      const diagnostic = app.logs.find(line => line.includes('request budget failure:'));
+      assert.ok(diagnostic);
+      assert.match(diagnostic, /code=ETOKENBUDGET; maxTokens=8192, fixedTokens=900, estimatedOutputTokens=1024, reserveTokens=1024, availableTokens=-756, contextBytes=0, bytesPerToken=2$/);
+      assert.doesNotMatch(app.logs.join('\n'), /PRIVATE_|SECRET_TOKEN|unknownCount|123456/);
+    } finally { app.dispose(); }
+  }
+});
+
+test('budget diagnostics omit non-finite fields and ignore unrelated errors', async () => {
+  for (const code of ['ETOKENBUDGET', 'ECODEX_AUTH']) {
+    const error = Object.assign(new Error('Controlled failure'), {
+      code,
+      budgetPlan: { maxTokens: Infinity, fixedBytes: NaN, contextBytes: -Infinity, secret: 'SECRET_TOKEN' }
+    });
+    const app = controller({ runModel:async () => { throw error; } });
+    try {
+      await assert.rejects(app.generate(), /Controlled failure/);
+      assert.equal(app.logs.some(line => line.includes('request budget failure:')), false);
+      assert.doesNotMatch(app.logs.join('\n'), /Infinity|NaN|SECRET_TOKEN/);
+    } finally { app.dispose(); }
+  }
 });
