@@ -14,8 +14,8 @@ const repo = createGitRepository({
   runProcess: async (command, args, options) => {
     calls.push({ command, args, options });
     if (args[0] === 'rev-parse') return { stdout: `${head}\n`, stderr: '' };
-    if (args[0] === 'diff' && args.includes('--name-only')) throw new Error('Path inventories must use the binary runner.');
-    if (args[0] === 'diff') return { stdout: 'diff --git a/src/a.c b/src/a.c\n+change\n', stderr: '' };
+    if (args.includes('diff') && args.includes('--name-only')) throw new Error('Path inventories must use the binary runner.');
+    if (args.includes('diff')) return { stdout: 'diff --git a/src/a.c b/src/a.c\n+change\n', stderr: '' };
     if (args[0] === 'ls-files' && args[1] === '-u') return { stdout: '', stderr: '' };
     if (args[0] === 'log') return { stdout: 'fix(core): repair race\0feat(core): add guard\0chore(core): update metadata\0', stderr: '' };
     if (args[0] === 'ls-tree') return { stdout: '100644 blob deadbeef\t.codex-safe.json\0', stderr: '' };
@@ -24,7 +24,7 @@ const repo = createGitRepository({
   },
   runProcessBuffer: async (command, args, options) => {
     calls.push({ command, args, options });
-    if (args[0] === 'diff' && args.includes('--name-only') && args.includes('-z')) {
+    if (args.includes('diff') && args.includes('--name-only') && args.includes('-z')) {
       return { stdout: Buffer.from(stagedPaths.join('\0') + '\0', 'utf8'), stderr: Buffer.alloc(0) };
     }
     assert.deepStrictEqual(args, ['ls-files', '--stage', '-z']);
@@ -38,6 +38,9 @@ const repo = createGitRepository({
   assert.strictEqual(await repo.hasUnmergedEntries('/repo'), false);
   assert.deepStrictEqual(await repo.getStagedPaths('/repo'), stagedPaths);
   assert.match(await repo.getStagedDiff('/repo'), /^diff --git/);
+  for (const call of calls.filter(x=>x.args.includes('diff'))) {
+    for (const flag of ['-M','-C','--no-relative','--src-prefix=a/','--dst-prefix=b/','--no-color','--no-ext-diff','--no-textconv']) assert.ok(call.args.includes(flag),flag);
+  }
   const fingerprint = crypto.createHash('sha256').update(indexBytes).digest('hex');
   assert.strictEqual(await repo.getIndexFingerprint('/repo'), fingerprint);
   assert.deepStrictEqual(await repo.getRepositorySnapshot('/repo'), { headOid: head, indexFingerprint: fingerprint });
