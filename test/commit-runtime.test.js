@@ -209,7 +209,7 @@ const runtime = createCommitRuntime({
     'GIT binary patch',
     'literal 1000000',
     binaryPayload
-  ].join('\\n');
+  ].join('\n');
   const singleBinaryInput = runtime.prepareStagedDiff(singleBinaryDiff, ['firmware/update.bin']);
   assert.equal(singleBinaryInput.sourceDiff, '');
   assert.equal(singleBinaryInput.binaryFileCount, 1);
@@ -220,8 +220,8 @@ const runtime = createCommitRuntime({
   assert(singleBinaryExecution, 'single binary file did not reach structured execution');
   assert.ok(singleBinaryResult.executionMeta.requestEstimate.totalTokens <= singleBinaryResult.executionMeta.maxEstimatedTokens);
   assert.equal(singleBinaryExecution.stdinText.includes('BINARY_PAYLOAD_SENTINEL_'), false);
-  assert.match(singleBinaryExecution.stdinText, /Binary files, metadata only \\(1\\):/);
-  assert.match(singleBinaryExecution.stdinText, /firmware\\/update\\.bin/);
+  assert.match(singleBinaryExecution.stdinText, /Binary files, metadata only \(1\):/);
+  assert.match(singleBinaryExecution.stdinText, /firmware\/update\.bin/);
 
   // Unknown multi-file blocks are omitted instead of being trusted as source.
   const ambiguousDiff = [
