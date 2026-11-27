@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.6.13
+
+- Keep Git-marked binary files metadata-only even with unfamiliar extensions; preserve binary classification after raw payload stripping through Safe Core 4.18.13.
+- Exercise the production staged-diff collector in real temporary Git repositories, including a >1 MiB binary, a forced-text `.bin` with noncanonical prefixes, and mixed binary/source changes. Only the Codex boundary is mocked.
+- Report finite, allowlisted request-budget numbers for generation and regeneration failures, including the final structured hard gate, without logging prompts, diffs, paths or credentials.
+- Pin all current shared Core workflows, including release integrity, to the same immutable Core 4.18.13 SHA. Preserve token ceilings and all release gates.
+
 ## 4.6.12
 
 - Pin immutable Safe Core 4.18.12 with corrected semantic-context inventory line breaks.
