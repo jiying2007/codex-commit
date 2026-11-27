@@ -448,6 +448,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
       return structured;
     } catch (error) {
       const err = /** @type {any} */ (error);
+      if (err?.code === 'ETOKENBUDGET') err.budgetPlan = requestBudget;
       if (err?.code === 'ECODEXVERSION') {
         const wrapped = /** @type {any} */ (new Error(
           ui(
