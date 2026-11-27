@@ -202,13 +202,13 @@ const runtime = createCommitRuntime({
   assert.equal(inventoryExecution.stdinText.includes('artifacts/0899.BIN'), false);
 
   // A single large .bin file must stay metadata-only; its payload must never enter model input.
-  const binaryPayload = 'BINARY_PAYLOAD_SENTINEL_'.repeat(50000);
+  const singleBinaryPayload = 'BINARY_PAYLOAD_SENTINEL_'.repeat(50000);
   const singleBinaryDiff = [
     'diff --git a/firmware/update.bin b/firmware/update.bin',
     'index 1111111..2222222 100644',
     'GIT binary patch',
     'literal 1000000',
-    binaryPayload
+    singleBinaryPayload
   ].join('\n');
   const singleBinaryInput = runtime.prepareStagedDiff(singleBinaryDiff, ['firmware/update.bin']);
   assert.equal(singleBinaryInput.sourceDiff, '');
