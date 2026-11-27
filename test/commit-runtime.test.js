@@ -201,6 +201,28 @@ const runtime = createCommitRuntime({
   assert.match(inventoryExecution.stdinText, /Binary files, metadata only/);
   assert.equal(inventoryExecution.stdinText.includes('artifacts/0899.BIN'), false);
 
+  // A single large .bin file must stay metadata-only; its payload must never enter model input.
+  const singleBinaryPayload = 'BINARY_PAYLOAD_SENTINEL_'.repeat(50000);
+  const singleBinaryDiff = [
+    'diff --git a/firmware/update.bin b/firmware/update.bin',
+    'index 1111111..2222222 100644',
+    'GIT binary patch',
+    'literal 1000000',
+    singleBinaryPayload
+  ].join('\n');
+  const singleBinaryInput = runtime.prepareStagedDiff(singleBinaryDiff, ['firmware/update.bin']);
+  assert.equal(singleBinaryInput.sourceDiff, '');
+  assert.equal(singleBinaryInput.binaryFileCount, 1);
+  assert.ok(singleBinaryInput.rawDiffBytes > 1000000);
+  const singleBinaryStart = calls.length;
+  const singleBinaryResult = await runtime.runCodex(singleBinaryInput, options, '', '', []);
+  const singleBinaryExecution = calls.slice(singleBinaryStart).find(call => call.args.includes('exec') && call.args.includes('--output-schema'));
+  assert(singleBinaryExecution, 'single binary file did not reach structured execution');
+  assert.ok(singleBinaryResult.executionMeta.requestEstimate.totalTokens <= singleBinaryResult.executionMeta.maxEstimatedTokens);
+  assert.equal(singleBinaryExecution.stdinText.includes('BINARY_PAYLOAD_SENTINEL_'), false);
+  assert.match(singleBinaryExecution.stdinText, /Binary files, metadata only \(1\):/);
+  assert.match(singleBinaryExecution.stdinText, /firmware\/update\.bin/);
+
   // Unknown multi-file blocks are omitted instead of being trusted as source.
   const ambiguousDiff = [
     'diff --git firmware/robot.bin firmware/robot.bin',

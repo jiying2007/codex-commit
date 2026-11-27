@@ -160,12 +160,12 @@ jobs:
 
   family-release-guard:
     if: github.event_name == 'pull_request'
-    uses: jiying2007/codex-safe-core/.github/workflows/family-release-guard.yml@13727c90caeb8b0a6029471d8b5ef49f2d06e6d2
+    uses: jiying2007/codex-safe-core/.github/workflows/family-release-guard.yml@57312f9c044f56a66cd5f65b473cbe24ea4d9cb2
     secrets:
       CODEX_SAFE_FAMILY_READ_TOKEN: ${{ secrets.CODEX_SAFE_FAMILY_READ_TOKEN }}
     with:
       product: codex-commit-safe
-      expected_core_sha: 13727c90caeb8b0a6029471d8b5ef49f2d06e6d2
+      expected_core_sha: 57312f9c044f56a66cd5f65b473cbe24ea4d9cb2
 
   ci-gate:
     name: CI Gate

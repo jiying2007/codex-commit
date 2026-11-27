@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.6.12
+
+- Pin immutable Safe Core 4.18.12 with corrected semantic-context inventory line breaks.
+- Add a regression using a large single `.bin` payload to prove binary content remains metadata-only and does not consume structured model input.
+
 ## 4.6.11
 
 - Resolve staged Diff blocks against the staged path inventory before semantic analysis; binary/generated payloads and unmatched blocks are excluded from model context, while raw staged Diff remains available for provenance.
