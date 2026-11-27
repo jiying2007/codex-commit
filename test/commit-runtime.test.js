@@ -183,6 +183,11 @@ const runtime = createCommitRuntime({
   const binaryInventory = Array.from({ length: 900 }, (_, index) => `artifacts/${String(index).padStart(4, '0')}.BIN`);
   const inventoryPaths = [...binaryInventory, 'src/main.c'];
   const inventoryDiff = [
+    ...binaryInventory.flatMap(file => [
+      `diff --git a/${file} b/${file}`,
+      'new file mode 100644',
+      `Binary files /dev/null and b/${file} differ`
+    ]),
     'diff --git a/src/main.c b/src/main.c',
     '--- a/src/main.c',
     '+++ b/src/main.c',
@@ -223,7 +228,7 @@ const runtime = createCommitRuntime({
   assert.match(singleBinaryExecution.stdinText, /Binary files, metadata only \(1\):/);
   assert.match(singleBinaryExecution.stdinText, /firmware\/update\.bin/);
 
-  // Unknown multi-file blocks are omitted instead of being trusted as source.
+  // Unknown multi-file blocks make the snapshot incomplete before any Codex call.
   const ambiguousDiff = [
     'diff --git firmware/robot.bin firmware/robot.bin',
     'index 1111111..2222222 100644',
@@ -237,9 +242,17 @@ const runtime = createCommitRuntime({
     '-old',
     '+new'
   ].join('\n');
-  const ambiguousInput = runtime.prepareStagedDiff(ambiguousDiff, ['firmware/robot.bin', 'src/main.c']);
-  assert.strictEqual(ambiguousInput.unmappedDiffBlocks, 2);
-  assert.strictEqual(ambiguousInput.sourceDiff, '');
+  const incompleteStart = calls.length;
+  assert.throws(() => runtime.prepareStagedDiff(ambiguousDiff, ['firmware/robot.bin', 'src/main.c']),
+    error => error.code === 'ESTAGEDDIFFINCOMPLETE' && error.unmappedDiffBlocks === 2 && error.missingDiffPaths === 2);
+  const knownSource = 'diff --git a/src/main.c b/src/main.c\n--- a/src/main.c\n+++ b/src/main.c\n@@ -1 +1 @@\n-old\n+new';
+  assert.throws(() => runtime.prepareStagedDiff(knownSource, ['src/main.c','firmware/robot.bin']),
+    error => error.code === 'ESTAGEDDIFFINCOMPLETE' && error.missingDiffPaths === 1);
+  assert.throws(() => runtime.prepareStagedDiff(knownSource, ['other.c']),
+    error => error.code === 'ESTAGEDDIFFINCOMPLETE' && error.unmappedDiffBlocks === 1);
+  assert.throws(() => runtime.prepareStagedDiff('not a Git patch', ['src/main.c']),
+    error => error.code === 'ESTAGEDDIFFINCOMPLETE');
+  assert.equal(calls.length, incompleteStart, 'incomplete inventory must not invoke Codex');
 
   // A one-file text diff with a non-canonical prefix is still resolvable.
   const unprefixedSourceDiff = [

@@ -156,3 +156,18 @@ test('Git binary metadata promotes unknown extensions without hiding source hunk
   assert.match(snapshot.input, /\+Binary files a\/example b\/example differ/);
   assert.match(snapshot.input, /SOURCE_EVIDENCE_MUST_REMAIN/);
 });
+
+
+test('multiple real staged files with unsupported no-prefix headers fail before any Codex request', async t => {
+  const root = fixture(t);
+  write(root, 'firmware/update.bin', binaryBytes);
+  write(root, 'src/main.c', 'int main(void) { return 0; }\n');
+  git(root, ['config', 'diff.noprefix', 'true']);
+  git(root, ['add', '--', 'firmware/update.bin', 'src/main.c']);
+  const [diff, files] = await Promise.all([repository.getStagedDiff(root), repository.getStagedPaths(root)]);
+  assert.equal(files.length, 2);
+  assert.match(diff, /^diff --git firmware\/update\.bin firmware\/update\.bin$/m);
+  const { runtime, requests } = mockRuntime();
+  assert.throws(() => runtime.prepareStagedDiff(diff, files), error => error.code === 'ESTAGEDDIFFINCOMPLETE' && error.unmappedDiffBlocks > 0);
+  assert.equal(requests.length, 0);
+});
