@@ -33,6 +33,7 @@ Remote SSH、Dev Containers、Codespaces、WSL 场景下，需要在对应远端
 - 调用模型前先做确定性 scope 推断；
 - 近期 Commit 风格仅在本地归纳，不把原始历史提交文本发送给 Codex；
 - Safe Core Semantic Context Budget 对 source/generated/binary 文件做确定性预算；
+- 完整的纯二进制/生成物 staged 变更默认使用保守本地摘要，零模型调用；源码/混合变更、显式额外文案指令或带已有草稿的重新生成仍走一次有界语义调用。确定性 Receipt 明确标记 `deterministic-only` / `not-invoked`，不冒用未调用的模型身份；
 - Structured Output 通过本地 schema/语义校验后才写 SCM 输入框；
 - HEAD/index 变化会使 stale result 失效；
 - 匹配的 Review Receipt v5 可进入 Commit provenance；

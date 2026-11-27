@@ -171,3 +171,42 @@ test('multiple real staged files with unsupported no-prefix headers fail before 
   assert.throws(() => runtime.prepareStagedDiff(diff, files), error => error.code === 'ESTAGEDDIFFINCOMPLETE' && error.unmappedDiffBlocks > 0);
   assert.equal(requests.length, 0);
 });
+
+test('default generation of real binary and generated-only changes invokes no Codex process',async t=>{
+ const root=fixture(t);
+ write(root,'firmware/update.bin',binaryBytes);
+ write(root,'package-lock.json','{"lockfileVersion":3}\n');
+ git(root,['add','--','firmware/update.bin','package-lock.json']);
+ const [diff,files]=await Promise.all([repository.getStagedDiff(root),repository.getStagedPaths(root)]);
+ let processCalls=0;
+ const runtime=createCommitRuntime({ui,runPreparedProcess:async()=>{processCalls++;throw new Error('Codex must not start');}});
+ const staged=runtime.prepareStagedDiff(diff,files);
+ const options={language:'en',subjectMaxLength:72,maxBodyChars:2000,scopePolicy:'strict',scopes:['firmware'],extraInstructions:'',model:'configured-model'};
+ const result=await runtime.generateCommit(staged,options,'firmware','',[]);
+ assert.equal(processCalls,0);
+ assert.equal(result.executionMeta.modelCalls,0);
+ assert.equal(result.executionMeta.requestedModel,'');
+ assert.equal(result.executionMeta.resolvedModel,'deterministic-only');
+ assert.equal(result.executionMeta.codexVersion,'not-invoked');
+ assert.equal(runtime.formatCommitMessage(result,options),'chore(firmware): record artifact changes');
+ const chinese=await runtime.generateCommit(staged,{...options,language:'zh-CN'},'not-approved','',[]);
+ assert.equal(runtime.formatCommitMessage(chinese,options),'chore: 记录产物变更');
+ assert.equal(processCalls,0);
+});
+test('source or explicit style request retains one bounded semantic call',async t=>{
+ const root=fixture(t);
+ write(root,'firmware/update.bin',binaryBytes);
+ git(root,['add','--','firmware/update.bin']);
+ const {runtime,requests}=mockRuntime();
+ const options={language:'en',subjectMaxLength:72,maxBodyChars:2000,maxDiffBytes:262144,scopePolicy:'flexible',scopes:[],extraInstructions:'Use project style',codexPath:'codex',model:'',codexRuntime:loadSafeCore().normalizeCodexRuntimeOptions({provider:{mode:'openai'}})};
+ const collect=async()=>runtime.prepareStagedDiff(await repository.getStagedDiff(root),await repository.getStagedPaths(root));
+ await runtime.generateCommit(await collect(),options,'','',[]);
+ assert.equal(requests.length,1);
+ assert.ok(!requests[0].includes(privateSentinel));
+ write(root,'main.c','int main(void) { return 0; }\n');
+ git(root,['add','--','main.c']);
+ await runtime.generateCommit(await collect(),{...options,extraInstructions:''},'','',[]);
+ assert.equal(requests.length,2);
+ assert.ok(requests[1].includes('int main'));
+ assert.ok(!requests[1].includes(privateSentinel));
+});

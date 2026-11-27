@@ -33,6 +33,7 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - deterministic scope inference before model execution;
 - recent commit style is summarized locally instead of sending raw history;
 - Safe Core Semantic Context Budget handles source/generated/binary files predictably;
+- complete binary/generated-only staged changes use a conservative local summary with zero model calls by default; source/mixed changes, explicit extra instructions or regeneration with a previous draft use the existing bounded semantic request. Deterministic receipts identify `deterministic-only` and `not-invoked`, never a model that was not called;
 - Structured Output is schema/semantics validated before entering the SCM input;
 - HEAD/index changes invalidate stale results;
 - matching Review Receipt v5 can be incorporated into Commit provenance;
