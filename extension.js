@@ -35,7 +35,7 @@ const {
   fingerprintDiff,
   readProjectRulesAtHead
 } = createGitRepository({ runProcess, runProcessBuffer, ui });
-const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, prepareStagedDiff, runCodex } = createCommitRuntime({ runPreparedProcess, ui });
+const { formatCommitMessage, resolveCodexExecutable, probeCodexCapabilities, probeCodexRuntime, prepareStagedDiff, generateCommit } = createCommitRuntime({ runPreparedProcess, ui });
 const { getEffectiveOptions } = createCommitPolicy({ ui, readProjectRulesAtHead });
 const { getRepositories, chooseRepository, compareAndSetCommitInput, getCurrentCommitInput } = createRepositoryUi({
   getRepositoryRoot,
@@ -234,7 +234,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
         );
         if (repositoryStyleGuidance.length) log(`repository style prior prepared: rules=${repositoryStyleGuidance.length}`);
 
-        const structured = await runCodex(
+        const structured = await generateCommit(
           stagedInput,
           options,
           preferredScope,
@@ -243,9 +243,13 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
           token
         );
         const requestMeta = structured.executionMeta || {};
-        log(
-          `structured request estimate: ${requestMeta.requestEstimate?.totalTokens || 0}/${requestMeta.maxEstimatedTokens || 0} tokens; rawDiffBytes=${requestMeta.inputDiffBytes || 0}; semanticContextBytes=${requestMeta.semanticContextBytes || 0}`
-        );
+        if (requestMeta.executionMode === 'deterministic') {
+          log(`deterministic artifact summary: modelCalls=0; rawDiffBytes=${requestMeta.inputDiffBytes || 0}`);
+        } else {
+          log(
+            `structured request estimate: ${requestMeta.requestEstimate?.totalTokens || 0}/${requestMeta.maxEstimatedTokens || 0} tokens; rawDiffBytes=${requestMeta.inputDiffBytes || 0}; semanticContextBytes=${requestMeta.semanticContextBytes || 0}`
+          );
+        }
         const diffFingerprint = await fingerprintDiff(diff);
         return { structured, repositorySnapshot: snapshotAfter, diffFingerprint };
       } finally {
@@ -316,7 +320,7 @@ async function generate({ regenerate = false, commandArgs = [] } = {}) {
           ? fingerprint(reviewEvidence.receipt)
           : '<none>',
         model: generationResult.structured.executionMeta?.resolvedModel || options.model || 'cli-default',
-        requestedModel: generationResult.structured.executionMeta?.requestedModel || options.model || '',
+        requestedModel: generationResult.structured.executionMeta?.requestedModel ?? options.model ?? '',
         resolvedModel: generationResult.structured.executionMeta?.resolvedModel || options.model || '',
         codexVersion: generationResult.structured.executionMeta?.codexVersion || 'unknown',
         createdAt: new Date().toISOString(),

@@ -487,6 +487,49 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     }
   }
 
+  /** Select the lowest-cost sufficient execution path. Only a complete
+   * metadata-only inventory is eligible; source changes and explicit style
+   * instructions retain the existing single semantic request.
+   */
+  async function generateCommit(stagedInput, options, preferredScope, previousMessage, repositoryStyleGuidance, token) {
+    const count = stagedInput?.files?.length;
+    const metadataOnly = Number.isSafeInteger(count) && count > 0 &&
+      stagedInput.sourceFileCount === 0 && stagedInput.sourceDiff === '' &&
+      stagedInput.unmappedDiffBlocks === 0 &&
+      stagedInput.binaryFileCount + stagedInput.generatedFileCount === count;
+    if (!metadataOnly || String(options.extraInstructions || '').trim() || previousMessage) {
+      return runCodex(stagedInput, options, preferredScope, previousMessage, repositoryStyleGuidance, token);
+    }
+    if (token?.isCancellationRequested) throw Object.assign(new Error('Commit generation cancelled.'), { code:'ECANCELLED' });
+    const binary = stagedInput.binaryFileCount > 0, generated = stagedInput.generatedFileCount > 0;
+    const description = options.language === 'en'
+      ? binary && generated ? 'record artifact changes' : binary ? 'record binary artifact changes' : 'record generated file changes'
+      : binary && generated ? '记录产物变更' : binary ? '记录二进制文件变更' : '记录生成文件变更';
+    // Never insert raw path text into a commit message or claim internal
+    // behavior from binary/generated metadata. Scope is a validated local prior.
+    let scope = /^[a-z0-9][a-z0-9._-]{0,31}$/.test(String(preferredScope || '')) ? String(preferredScope) : '';
+    if (options.scopePolicy === 'strict' && !(options.scopes || []).includes(scope)) scope = '';
+    if (`chore(${scope}): ${description}`.length > options.subjectMaxLength) scope = '';
+    const structured = validateStructuredResult({ type:'chore', scope, description, body:[] }, options);
+    Object.defineProperty(structured, 'executionMeta', {
+      value: Object.freeze({
+        executionMode:'deterministic',
+        modelCalls:0,
+        requestedModel:'',
+        resolvedModel:'deterministic-only',
+        codexVersion:'not-invoked',
+        inputDiffBytes:stagedInput.rawDiffBytes,
+        semanticDiffBytes:0,
+        semanticContextBytes:0,
+        sourceFileCount:0,
+        generatedFileCount:stagedInput.generatedFileCount,
+        binaryFileCount:stagedInput.binaryFileCount
+      }),
+      enumerable:false, configurable:false, writable:false
+    });
+    return structured;
+  }
+
   return Object.freeze({
     VALID_TYPES,
     buildPrompt,
@@ -499,6 +542,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     probeCodexRuntime: request => cli.probeCodexRuntime(request),
     buildCodexArgs,
     prepareStagedDiff,
+    generateCommit,
     runCodex,
     findWindowsCodexCandidates: cli.findWindowsCodexCandidates,
     withTemporaryDirectory: cli.withTemporaryDirectory

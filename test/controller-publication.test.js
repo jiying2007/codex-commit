@@ -54,7 +54,7 @@ function controller({ runModel, reviewEvidence, snapshotAt, loadPolicy, notifica
           sourceFileCount:files.length, generatedFileCount:0, binaryFileCount:0,
           excludedBinaryDiffBlocks:0, excludedGeneratedDiffBlocks:0, unmappedDiffBlocks:0
         }),
-        runCodex:async () => { const number = ++modelCalls; if (runModel) await runModel(number); return { description:`generated-${number}` }; }
+        generateCommit:async () => { const number = ++modelCalls; if (runModel) await runModel(number); return { description:`generated-${number}` }; }
       }) };
       if (request === './src/receipts') return { fingerprintCommitMessage:() => 'd'.repeat(64), createCommitReceiptStore:() => ({ restore() {}, persistPending:async (_root, receipt) => { receipts.push(receipt); } }) };
       if (request === './src/policy') return { createCommitPolicy:() => ({ getEffectiveOptions:async () => { if (loadPolicy) await loadPolicy(++policyCalls); return { autoInferScope:false, policyFingerprint:'e'.repeat(64) }; } }) };
