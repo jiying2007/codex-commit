@@ -16,9 +16,9 @@ const { runProcess, runProcessBuffer } = createProcessRunner(ui);
 const repository = createGitRepository({ runProcess, runProcessBuffer, ui });
 const privateSentinel = 'PRIVATE_BINARY_FIXTURE_MUST_NOT_REACH_CODEX';
 const binaryBytes = Buffer.concat([
-  Buffer.from(privateSentinel + '\n'),
+  Buffer.from(privateSentinel + '\0\n'),
   Buffer.alloc(1024 * 1024 + 4096, 0x42),
-  Buffer.from('\0\n')
+  Buffer.from('\n')
 ]);
 
 function git(root, args) {
