@@ -285,6 +285,8 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     }))];
     const knownPaths = new Set(files);
     const blocks = safeCore.splitUnifiedDiff(rawDiff);
+    const fileKinds = new Map(files.map(file => [file, safeCore.classifyPath(file)]));
+    const mappedBlocks = [];
     const sourceBlocks = [];
     let excludedBinaryDiffBlocks = 0;
     let excludedGeneratedDiffBlocks = 0;
@@ -298,8 +300,14 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
         unmappedDiffBlocks += 1;
         continue;
       }
+      // Git's binary metadata also covers extensionless and unfamiliar formats.
+      // Promote before selecting source blocks so binary evidence never downgrades.
+      if (block.kind === 'binary') fileKinds.set(stagedPath, 'binary');
+      mappedBlocks.push({ block, stagedPath });
+    }
 
-      const kind = safeCore.classifyPath(stagedPath);
+    for (const { block, stagedPath } of mappedBlocks) {
+      const kind = fileKinds.get(stagedPath);
       if (kind === 'binary') {
         excludedBinaryDiffBlocks += 1;
         continue;
@@ -312,9 +320,10 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     }
 
     const sourceDiff = sourceBlocks.join('\n');
-    const countKind = kind => files.filter(file => safeCore.classifyPath(file) === kind).length;
+    const countKind = kind => files.filter(file => fileKinds.get(file) === kind).length;
     return Object.freeze({
       files: Object.freeze(files),
+      binaryPaths: Object.freeze(files.filter(file => fileKinds.get(file) === 'binary')),
       sourceDiff,
       rawDiffBytes: Buffer.byteLength(rawDiff, 'utf8'),
       sourceDiffBytes: Buffer.byteLength(sourceDiff, 'utf8'),
@@ -373,6 +382,7 @@ function createCommitRuntime({ runPreparedProcess, ui }) {
     }
     const semanticContext = safeCore.buildSemanticContext({
       files: stagedInput.files,
+      binaryPaths: stagedInput.binaryPaths,
       diff: stagedInput.sourceDiff,
       maxBytes: requestBudget.contextBytes
     });
