@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.6.14
+
+- Reject incomplete or mismatched staged file inventories before any model invocation.
+- Generate conservative binary/generated-only commit summaries locally by default, with truthful zero-model provenance.
+- Canonicalize staged patch, path inventory, and committed receipt readback against local prefix, color, relative-path and rename settings; preserve strict bounds and binary isolation.
+- Preserve existing Core 4.18.13 runtime identity and release gates. Old rendering-dependent receipts are not remapped when their fingerprints differ.
+
 ## 4.6.13
 
 - Keep Git-marked binary files metadata-only even with unfamiliar extensions; preserve binary classification after raw payload stripping through Safe Core 4.18.13.

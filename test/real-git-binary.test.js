@@ -110,7 +110,7 @@ test('production Git collection keeps a real >1 MiB staged .bin metadata-only', 
   assert.match(snapshot.input, /firmware\/update\.bin/);
 });
 
-test('a real large .bin diff forced to text stays excluded with noncanonical Git prefixes', async t => {
+test('a real large .bin diff forced to text stays excluded when local Git requests noncanonical prefixes', async t => {
   const root = fixture(t);
   // Working-tree attributes affect Git's diff rendering even though only the
   // binary artifact is staged. The production collector must still isolate it.
@@ -121,7 +121,7 @@ test('a real large .bin diff forced to text stays excluded with noncanonical Git
 
   const snapshot = await collectAndGenerate(root);
   assert.deepEqual(snapshot.files, ['firmware/update.bin']);
-  assert.match(snapshot.diff, /^diff --git firmware\/update\.bin firmware\/update\.bin$/m);
+  assert.match(snapshot.diff, /^diff --git a\/firmware\/update\.bin b\/firmware\/update\.bin$/m);
   assert.ok(snapshot.diff.includes(privateSentinel));
   assert.ok(snapshot.prepared.rawDiffBytes > 1024 * 1024);
   assert.equal(snapshot.prepared.sourceDiff, '');
@@ -158,7 +158,7 @@ test('Git binary metadata promotes unknown extensions without hiding source hunk
 });
 
 
-test('multiple real staged files with unsupported no-prefix headers fail before any Codex request', async t => {
+test('multiple real staged files retain complete canonical headers despite local no-prefix configuration', async t => {
   const root = fixture(t);
   write(root, 'firmware/update.bin', binaryBytes);
   write(root, 'src/main.c', 'int main(void) { return 0; }\n');
@@ -166,10 +166,14 @@ test('multiple real staged files with unsupported no-prefix headers fail before 
   git(root, ['add', '--', 'firmware/update.bin', 'src/main.c']);
   const [diff, files] = await Promise.all([repository.getStagedDiff(root), repository.getStagedPaths(root)]);
   assert.equal(files.length, 2);
-  assert.match(diff, /^diff --git firmware\/update\.bin firmware\/update\.bin$/m);
+  assert.match(diff, /^diff --git a\/firmware\/update\.bin b\/firmware\/update\.bin$/m);
   const { runtime, requests } = mockRuntime();
-  assert.throws(() => runtime.prepareStagedDiff(diff, files), error => error.code === 'ESTAGEDDIFFINCOMPLETE' && error.unmappedDiffBlocks > 0);
-  assert.equal(requests.length, 0);
+  const staged=runtime.prepareStagedDiff(diff,files);
+  assert.equal(staged.unmappedDiffBlocks,0);
+  assert.equal(staged.binaryFileCount,1);
+  assert.equal(staged.sourceFileCount,1);
+  assert.match(staged.sourceDiff,/int main/);
+  assert.equal(requests.length,0);
 });
 
 test('default generation of real binary and generated-only changes invokes no Codex process',async t=>{
@@ -209,4 +213,29 @@ test('source or explicit style request retains one bounded semantic call',async 
  assert.equal(requests.length,2);
  assert.ok(requests[1].includes('int main'));
  assert.ok(!requests[1].includes(privateSentinel));
+});
+
+test('canonical staged and committed receipt diffs remain identical after rendering configuration changes',async t=>{
+ const root=fixture(t);
+ git(root,['config','user.email','fixture@example.invalid']);
+ git(root,['config','user.name','fixture']);
+ write(root,'src/a.c','old\n');
+ git(root,['add','--','src/a.c']);
+ git(root,['commit','-qm','base']);
+ const before=(await repository.getRepositorySnapshot(root)).headOid;
+ git(root,['mv','src/a.c','src/b.c']);
+ const staged=await repository.getStagedDiff(root);
+ assert.deepEqual(await repository.getStagedPaths(root),['src/b.c']);
+ git(root,['config','diff.noprefix','true']);
+ git(root,['config','diff.mnemonicPrefix','true']);
+ git(root,['config','diff.renames','false']);
+ git(root,['config','diff.relative','true']);
+ git(root,['config','color.diff','always']);
+ assert.equal(await repository.getStagedDiff(root),staged);
+ assert.deepEqual(await repository.getStagedPaths(root),['src/b.c']);
+ git(root,['commit','-qm','chore: rename fixture']);
+ const after=(await repository.getRepositorySnapshot(root)).headOid;
+ const result=await repository.git(['diff','--no-ext-diff','--no-textconv','--unified=3',before,after,'--'],root);
+ assert.equal(result.stdout,staged);
+ assert.equal(repository.fingerprintDiff(result.stdout),repository.fingerprintDiff(staged));
 });

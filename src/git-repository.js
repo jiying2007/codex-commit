@@ -35,8 +35,26 @@ function decodeGitRootOutput(stdout) {
   return root;
 }
 
+// Use one patch-rendering policy for staged input, its path inventory, and
+// committed receipt readback. Core remains the only process/binary inventory
+// runner. Match Review's a/b prefixes and rename/copy semantics.
+function canonicalDiffArgs(args) {
+  if (args[0] !== 'diff') return args;
+  return ['-c', 'core.quotePath=false', 'diff', '-M', '-C', '--no-relative',
+    '--src-prefix=a/', '--dst-prefix=b/', '--no-color', '--submodule=short',
+    '--no-ext-diff', '--no-textconv', ...args.slice(1)];
+}
+
+function withCanonicalDiff(runner) {
+  return (command, args, ...rest) => runner(command, command === 'git' ? canonicalDiffArgs(args) : args, ...rest);
+}
+
 function createGitRepository({ runProcess, runProcessBuffer, ui }) {
-  const core = createCoreGitRepository({ runProcess, runProcessBuffer, ui });
+  const core = createCoreGitRepository({
+    runProcess: withCanonicalDiff(runProcess),
+    runProcessBuffer: withCanonicalDiff(runProcessBuffer),
+    ui
+  });
 
   async function getRepositoryRoot(folder, token) {
     const { stdout } = await runProcessBuffer('git', ['rev-parse', '--show-toplevel'], {
