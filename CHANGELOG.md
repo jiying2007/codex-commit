@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.6.15
+
+- Adopt exact immutable Core 4.18.15 (runtime digest `9331f48aa1e943293a5d89371df68bb3d688937cf62c5b90442bdca5c128e39d`), synchronizing the shared workflow and policy schema pins. Preserve deterministic metadata-only generation, bounded semantic requests, snapshot and receipt checks.
+
 ## 4.6.14
 
 - Reject incomplete or mismatched staged file inventories before any model invocation.

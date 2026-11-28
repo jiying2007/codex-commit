@@ -42,7 +42,7 @@ See [Getting Started](docs/GETTING_STARTED.md) for installation, configuration a
 - Safe Contract v2 runs Codex ephemeral/read-only/no-approval with shell/web/apps/multi-agent/plugins/hooks/goals/memories/dependency installation disabled;
 - no source edit, commit or push side effect.
 
-Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.18.13** submodule at `d517dccf1e636f22fd7f9d938a5dd552a91420d3`.
+Shared safety/runtime and repository-policy validation come only from the exact commit-pinned **Codex Safe Core 4.18.15** submodule at `779afbd6982d6271942301e6f59656b50ff7e3cb`.
 
 ## Repository policy
 
@@ -50,7 +50,7 @@ The only repository policy is committed `.codex-safe.json` with `schemaVersion: 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/d517dccf1e636f22fd7f9d938a5dd552a91420d3/codex-safe.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jiying2007/codex-safe-core/779afbd6982d6271942301e6f59656b50ff7e3cb/codex-safe.schema.json",
   "schemaVersion": 4,
   "commit": {
     "language": "en",
